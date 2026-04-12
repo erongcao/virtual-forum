@@ -1,5 +1,5 @@
 /**
- * 虚拟论坛 - 主入口 (v3.5 博弈论增强版)
+ * 虚拟论坛 - 主入口 (v3.6.1 行为经济学增强版)
  * Virtual Forum Main Entry
  */
 
@@ -8,6 +8,7 @@ const ArgumentTracker = require('./argument-tracker.js');
 const OutputFormatter = require('./output-formatter.js');
 const SubagentArena = require('./subagent-arena.js');
 const GameTheorySubagentArena = require('./v3/game-theory-arena.js');
+const BehavioralEconomicsSubagentArena = require('./v3/behavioral-arena.js');
 const ContextManager = require('./context-manager.js');
 
 class VirtualForum {
@@ -77,6 +78,43 @@ class VirtualForum {
     const gameTheoryReport = this.arena.getGameTheoryReport();
 
     return { arena: result, output, gameTheoryReport };
+  }
+
+  /**
+   * 🧠 启动行为经济学增强的子代理辩论模式（v3.6.1）
+   * 集成前景理论、有限理性、助推理论
+   */
+  async launchBehavioralEconomicsArena(config) {
+    const {
+      topic, mode = 'adversarial', rounds = 10,
+      participants = [], moderatorName = '巴菲特',
+      moderatorSkill = 'warren-buffett', moderatorStyle = 'provocative',
+      outputFormat = 'dialogue',
+      // 行为经济学参数
+      prospectTheory = {},
+      boundedRationality = {},
+      nudgeTheory = {},
+      // 博弈论参数
+      discountFactors, outsideOptions, totalValue = 100,
+      types, priorBeliefs, reputationTypes
+    } = config;
+
+    this.arena = new BehavioralEconomicsSubagentArena(this.skillsDir);
+    await this.arena.initArenaWithBehavioralEconomics({
+      topic, mode, rounds, participants,
+      moderatorName, moderatorSkill, moderatorStyle,
+      discountFactors, outsideOptions, totalValue,
+      types, priorBeliefs, reputationTypes,
+      prospectTheory, boundedRationality, nudgeTheory
+    });
+
+    const result = await this.arena.runDebate();
+    const output = this.arena.formatOutput(outputFormat);
+
+    // 附加行为经济学报告
+    const behavioralReport = this.arena.generateBehavioralReport();
+
+    return { arena: result, output, behavioralReport };
   }
 
   /**

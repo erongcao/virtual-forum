@@ -1,6 +1,6 @@
 {
   "name": "virtual-forum",
-  "version": "3.5.2",
+  "version": "3.6.1",
   "description": "虚拟论坛 - 让蒸馏的人物Skill就特定话题展开结构化讨论",
   "main": "index.js",
   "scripts": {
