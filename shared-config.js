@@ -1,61 +1,78 @@
 /**
- * 共享配置模块
- * Shared Configuration Module for Virtual Forum
- * 
- * 解决代码重复问题，提供统一的配置和工具函数
+ * 虚拟论坛 - 共享配置
+ * Shared Config for Virtual Forum v3.5
+ *
+ * 解决问题：
+ * - [P2] forum-engine.js 和 subagent-arena.js 中大量重复的模式/风格定义
+ * - [P1] 硬编码路径 /Users/caoyirong
  */
 
 const path = require('path');
 const fs = require('fs');
-const os = require('os');
 
-// 讨论模式定义
+/**
+ * 获取默认 Skills 目录（不再硬编码用户名）
+ */
+function getDefaultSkillsDir() {
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+  if (!home) {
+    console.warn('⚠️ 无法检测 HOME 目录，请通过构造函数显式传入 skillsDir');
+  }
+  return path.join(home, '.openclaw', 'skills');
+}
+
+/**
+ * 讨论模式定义（唯一来源）
+ */
 const DISCUSSION_MODES = {
-  adversarial: {
-    name: '对抗性辩论',
-    instruction: '这是对抗性辩论，你必须坚定维护自己的立场，积极反驳对方观点。',
-    description: '争辩 → 交锋 → 胜负/共识'
-  },
   exploratory: {
     name: '探索性讨论',
-    instruction: '这是探索性讨论，请从你的视角深入分析问题，展现多角度思维。',
-    description: '多角度剖析 → 发展 → 结论'
+    instruction: '这是探索性讨论，请从你的视角深入分析问题，展现多角度思维。'
+  },
+  adversarial: {
+    name: '对抗性辩论',
+    instruction: '这是对抗性辩论，你必须坚定维护自己的立场，积极反驳对方观点。'
   },
   decision: {
     name: '决策型讨论',
-    instruction: '这是决策型讨论，请分析各方案的利弊，给出建设性建议。',
-    description: '多专家投票 → 加权评分 → 行动'
+    instruction: '这是决策型讨论，请分析各方案的利弊，给出建设性建议。'
   }
 };
 
-// 主持人风格定义
+/**
+ * 主持人风格定义（唯一来源）
+ */
 const MODERATOR_STYLES = {
   balanced: {
     name: '理性主持人',
-    description: '客观中立，善于引导对话深入',
-    instruction: '你是理性主持人，客观中立，善于引导对话深入。'
+    style: '客观中立，善于引导对话',
+    questions: ['各位怎么看这个问题？', '有没有不同的观点？', '能否详细解释？']
   },
   provocative: {
     name: '犀利主持人',
-    description: '追问到底，挑战每个观点的漏洞',
-    instruction: '你是犀利主持人，追问到底，挑战每个观点的漏洞。'
+    style: '追问到底，挑战每个观点',
+    questions: ['为什么你这么认为？', '有没有相反的证据？', '你能为你的观点辩护吗？']
   },
   synthesizing: {
     name: '整合主持人',
-    description: '善于归纳各方观点，推动形成共识',
-    instruction: '你是整合主持人，善于归纳各方观点，推动形成共识。'
+    style: '善于归纳，推动形成共识',
+    questions: ['能否总结核心观点？', '大家有没有共同点？', '能否找到折中方案？']
   }
 };
 
-// 判定方式定义
+/**
+ * 胜负判定方式
+ */
 const VERDICT_TYPES = {
-  points: '点数制',
-  vote: '投票制',
-  concession: '让步制',
-  none: '无胜负'
+  points: 'points',
+  vote: 'vote',
+  concession: 'concession',
+  consensus: 'consensus'
 };
 
-// 默认配置
+/**
+ * 默认值
+ */
 const DEFAULTS = {
   mode: 'adversarial',
   rounds: 10,
@@ -66,159 +83,71 @@ const DEFAULTS = {
   outputFormat: 'dialogue',
   minResponseLength: 200,
   maxResponseLength: 400,
+  contextWindowSize: 6,
+  summarizeEveryNRounds: 5,
   apiRetryAttempts: 3,
-  contextWindowSize: 5, // 滑动窗口大小
-  summarizeEveryNRounds: 5, // 每N轮生成摘要
+  apiBaseDelay: 2000,
   gameTheory: {
     totalValue: 100,
     defaultDiscountFactor: 0.9,
-    defaultOutsideOption: 0,
-    defaultReputationType: 'neutral'
+    defaultOutsideOption: 20,
+    defaultReputationType: 'balanced'
   }
 };
 
 /**
- * 获取默认Skills目录
- * 修复硬编码路径问题
- */
-function getDefaultSkillsDir() {
-  // 优先级：环境变量 > HOME目录 > 当前用户目录
-  const homeDir = process.env.HOME || process.env.USERPROFILE || os.homedir();
-  
-  if (!homeDir) {
-    throw new Error('无法确定用户主目录，请设置 HOME 环境变量或手动指定 skillsDir');
-  }
-  
-  return path.join(homeDir, '.openclaw', 'skills');
-}
-
-/**
- * 加载Skill内容（共享函数）
- * @param {string} skillsDir - Skills目录
- * @param {string} skillName - Skill名称
- * @returns {string|null} - Skill内容或null
+ * 加载 Skill 内容（共享函数）
  */
 function loadSkill(skillsDir, skillName) {
-  if (!skillsDir || !skillName) {
-    console.warn('⚠️ 缺少 skillsDir 或 skillName');
-    return null;
-  }
-  
+  if (!skillName) return null;
   const skillPath = path.join(skillsDir, `${skillName}-perspective`, 'SKILL.md');
-  
   try {
     if (fs.existsSync(skillPath)) {
       return fs.readFileSync(skillPath, 'utf8');
     }
-    
-    // 尝试其他可能的命名格式
-    const alternativePath = path.join(skillsDir, `${skillName}`, 'SKILL.md');
-    if (fs.existsSync(alternativePath)) {
-      return fs.readFileSync(alternativePath, 'utf8');
-    }
-    
-    console.warn(`⚠️ Skill 文件不存在: ${skillPath}`);
-    return null;
   } catch (e) {
-    console.error(`❌ 加载 Skill ${skillName} 失败:`, e.message);
-    return null;
+    console.error(`Failed to load skill ${skillName}:`, e.message);
   }
+  return null;
 }
 
 /**
- * 验证配置
- * @param {object} config - 配置对象
- * @throws {Error} - 配置无效时抛出错误
+ * 输入验证（共享函数）
  */
 function validateConfig(config) {
-  if (!config || typeof config !== 'object') {
-    throw new Error('配置必须是一个对象');
-  }
-  
-  // 验证必需字段
+  if (!config) throw new Error('配置不能为空');
   if (!config.topic || typeof config.topic !== 'string' || config.topic.trim() === '') {
-    throw new Error('话题 (topic) 不能为空');
+    throw new Error('话题(topic)不能为空');
   }
-  
-  // 验证参与者
-  if (!Array.isArray(config.participants) || config.participants.length === 0) {
-    throw new Error('参与者 (participants) 必须是一个非空数组');
+  if (!Array.isArray(config.participants) || config.participants.length < 2) {
+    throw new Error('至少需要2位参与者(participants)');
   }
-  
-  // 验证轮次
   if (config.rounds !== undefined) {
-    const rounds = parseInt(config.rounds);
-    if (isNaN(rounds) || rounds < 1 || rounds > 100) {
-      throw new Error('轮次 (rounds) 必须是 1-100 之间的整数');
+    if (!Number.isInteger(config.rounds) || config.rounds < 1) {
+      throw new Error('轮次(rounds)必须是正整数');
     }
   }
-  
-  // 验证模式
   if (config.mode && !DISCUSSION_MODES[config.mode]) {
-    throw new Error(`无效的模式: ${config.mode}。可选: ${Object.keys(DISCUSSION_MODES).join(', ')}`);
+    throw new Error(`不支持的讨论模式: ${config.mode}，可选: ${Object.keys(DISCUSSION_MODES).join(', ')}`);
   }
-  
-  // 验证主持人风格
-  if (config.moderatorStyle && !MODERATOR_STYLES[config.moderatorStyle]) {
-    throw new Error(`无效的主持人风格: ${config.moderatorStyle}。可选: ${Object.keys(MODERATOR_STYLES).join(', ')}`);
-  }
-  
-  return true;
 }
 
 /**
  * 指数退避延迟
- * @param {number} attempt - 尝试次数（从0开始）
- * @returns {Promise<void>}
  */
-async function exponentialBackoff(attempt) {
-  const baseDelay = 1000; // 1秒基础延迟
-  const maxDelay = 30000; // 最大30秒
-  const delay = Math.min(baseDelay * Math.pow(2, attempt), maxDelay);
-  
-  console.log(`⏳ 等待 ${delay}ms 后重试...`);
-  await new Promise(resolve => setTimeout(resolve, delay));
-}
-
-/**
- * 速率限制器
- */
-class RateLimiter {
-  constructor(maxRequests = 10, windowMs = 60000) {
-    this.maxRequests = maxRequests;
-    this.windowMs = windowMs;
-    this.requests = [];
-  }
-  
-  async acquire() {
-    const now = Date.now();
-    
-    // 清理过期请求
-    this.requests = this.requests.filter(time => now - time < this.windowMs);
-    
-    // 检查是否超过限制
-    if (this.requests.length >= this.maxRequests) {
-      const oldestRequest = this.requests[0];
-      const waitTime = this.windowMs - (now - oldestRequest);
-      
-      console.log(`⏳ 速率限制: 等待 ${Math.ceil(waitTime / 1000)} 秒`);
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-      return this.acquire(); // 递归重试
-    }
-    
-    this.requests.push(now);
-    return true;
-  }
+async function exponentialBackoff(attempt, baseDelay = DEFAULTS.apiBaseDelay) {
+  const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000;
+  console.log(` ⏳ 等待 ${(delay / 1000).toFixed(1)}s 后重试...`);
+  return new Promise(resolve => setTimeout(resolve, delay));
 }
 
 module.exports = {
+  getDefaultSkillsDir,
   DISCUSSION_MODES,
   MODERATOR_STYLES,
   VERDICT_TYPES,
   DEFAULTS,
-  getDefaultSkillsDir,
   loadSkill,
   validateConfig,
-  exponentialBackoff,
-  RateLimiter
+  exponentialBackoff
 };
