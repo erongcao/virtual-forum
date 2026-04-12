@@ -1,6 +1,10 @@
 /**
  * 输出格式化器
- * Output Formatter for Virtual Forum
+ * Output Formatter for Virtual Forum v3.5
+ * 
+ * 修复：
+ * - [P2] 补全被截断的 formatReport 方法
+ * - 增加 formatDecision 实现
  */
 
 class OutputFormatter {
@@ -13,90 +17,124 @@ class OutputFormatter {
     };
   }
 
-  /**
-   * 格式化论坛结果
-   */
   format(forum, formatType = 'dialogue') {
     switch (formatType) {
-      case 'dialogue':
-        return this.formatDialogue(forum);
-      case 'report':
-        return this.formatReport(forum);
-      case 'decision':
-        return this.formatDecision(forum);
-      case 'json':
-        return this.formatJSON(forum);
-      default:
-        return this.formatDialogue(forum);
+      case 'dialogue': return this.formatDialogue(forum);
+      case 'report': return this.formatReport(forum);
+      case 'decision': return this.formatDecision(forum);
+      case 'json': return this.formatJSON(forum);
+      default: return this.formatDialogue(forum);
     }
   }
 
-  /**
-   * 对话流格式
-   */
   formatDialogue(forum) {
     let output = '';
-    
-    // 开场
-    output += this.formatOpening(forum.opening);
-    
-    // 每轮
-    for (const round of forum.roundsData) {
+    output += this.formatOpening(forum);
+    for (const round of (forum.roundsData || [])) {
       output += this.formatRound(round, forum.participants.length);
     }
-    
-    // 结果
     output += this.formatResult(forum.result);
-    
     return output;
   }
 
+  formatOpening(forum) {
+    let text = `\n${'═'.repeat(60)}\n`;
+    text += `🎭 虚拟论坛: ${forum.topic}\n`;
+    text += `${'═'.repeat(60)}\n\n`;
+    text += `📋 模式: ${forum.mode} | 轮次: ${forum.rounds}\n`;
+    text += `👥 参与者: ${forum.participants.map(p => p.name).join(' vs ')}\n`;
+    text += `🎙️ 主持人: ${forum.moderator?.name || '默认'}\n\n`;
+    text += `${'─'.repeat(60)}\n\n`;
+    return text;
+  }
+
+  formatRound(round, participantCount) {
+    let text = `\n📍 第 ${round.number} 轮\n\n`;
+    for (const speech of (round.speeches || [])) {
+      text += `【${speech.speaker}】\n${speech.content}\n\n`;
+    }
+    text += `${'─'.repeat(40)}\n`;
+    return text;
+  }
+
+  formatResult(result) {
+    if (!result) return '\n（讨论尚未产生结果）\n';
+    let text = `\n${'═'.repeat(60)}\n`;
+    text += `🏆 讨论结果\n`;
+    text += `${'═'.repeat(60)}\n\n`;
+    text += this.formatResultText(result);
+    return text;
+  }
+
+  formatResultText(result) {
+    if (!result) return '暂无结果\n';
+    if (typeof result === 'string') return result + '\n';
+    let text = '';
+    if (result.winner) text += `🥇 胜出: ${result.winner}\n`;
+    if (result.summary) text += `📝 总结: ${result.summary}\n`;
+    if (result.scores) {
+      text += `\n📊 得分:\n`;
+      for (const [name, score] of Object.entries(result.scores)) {
+        text += ` ${name}: ${score} 分\n`;
+      }
+    }
+    return text;
+  }
+
   /**
-   * 报告格式
+   * 报告格式（[P2 FIX] 补全被截断的代码）
    */
   formatReport(forum) {
     let report = '';
-    
     report += `# 🎭 虚拟论坛讨论报告\n\n`;
     report += `---\n\n`;
-    
-    // 话题
     report += `## 📌 讨论话题\n${forum.topic}\n\n`;
-    
-    // 配置
+
     report += `## ⚙️ 讨论配置\n`;
     report += `- 模式: ${forum.mode}\n`;
     report += `- 轮次: ${forum.rounds}\n`;
-    report += `- 主持人: ${forum.moderator.name}\n`;
-    report += `- 判定方式: ${forum.verdictType}\n\n`;
-    
-    // 参与者
+    report += `- 主持人: ${forum.moderator?.name || '默认'}\n`;
+    report += `- 判定方式: ${forum.verdictType || '点数制'}\n\n`;
+
     report += `## 👥 参与者\n`;
-    for (const p of forum.participants) {
+    for (const p of (forum.participants || [])) {
       report += `- **${p.name}**\n`;
     }
     report += `\n`;
-    
-    // 核心论点
+
     report += `## 💬 核心论点\n\n`;
-    for (const [name, args] of Object.entries(forum.arguments)) {
+    for (const [name, args] of Object.entries(forum.arguments || {})) {
       report += `### ${name}\n`;
-      const topArgs = args.filter(a => a.type === 'statement' || a.type === '立论').slice(0, 2);
+      const topArgs = (args || [])
+        .filter(a => a.type === 'statement' || a.type === '立论')
+        .slice(0, 3);
       for (const arg of topArgs) {
-        report += `> ${arg.text.slice(0, 150)}...\n\n`;
+        const text = arg.text || arg.content || '';
+        report += `> ${text.slice(0, 200)}${text.length > 200 ? '...' : ''}\n\n`;
       }
     }
-    
-    // 胜负
+
     report += `## 🏆 结果\n`;
     report += this.formatResultText(forum.result);
     report += `\n\n`;
-    
-    // 统计
-    report += `## 📊 统计数据\n`;
-    report += `- 总论点: ${Object.values(forum.arguments).flat().length}\n`;
-    report += `- 总轮次: ${forum.rounds}\n`;
-    
+
+    // [P2 FIX] 补全统计数据部分
+    report += `## 📊 统计数据\n\n`;
+    report += `| 参与者 | 得分 | 发言次数 |\n`;
+    report += `|--------|------|----------|\n`;
+    for (const p of (forum.participants || [])) {
+      const score = forum.scores?.[p.name] || 0;
+      const speeches = (forum.roundsData || [])
+        .reduce((count, round) => {
+          return count + (round.speeches || []).filter(s => s.speaker === p.name).length;
+        }, 0);
+      report += `| ${p.name} | ${score} | ${speeches} |\n`;
+    }
+    report += `\n`;
+
+    report += `---\n`;
+    report += `*报告生成时间: ${new Date().toLocaleString('zh-CN')}*\n`;
+
     return report;
   }
 
@@ -104,179 +142,38 @@ class OutputFormatter {
    * 决策格式
    */
   formatDecision(forum) {
-    let output = '';
-    
-    output += `# 🎯 决策建议\n\n`;
-    output += `## 📌 问题\n${forum.topic}\n\n`;
-    
-    // 各方立场
-    output += `## 👥 各方立场\n\n`;
-    for (const [name, args] of Object.entries(forum.arguments)) {
-      output += `### ${name}\n`;
-      const analyses = args.filter(a => a.type === 'analysis');
-      if (analyses.length > 0) {
-        output += `${analyses[0].text}\n\n`;
-      } else {
-        output += `${args[0]?.text || '（无分析）'}\n\n`;
+    let decision = '';
+    decision += `# 📋 决策报告: ${forum.topic}\n\n`;
+    decision += `## 参与决策的专家\n`;
+    for (const p of (forum.participants || [])) {
+      decision += `- ${p.name}\n`;
+    }
+    decision += `\n## 各方观点摘要\n\n`;
+    for (const [name, args] of Object.entries(forum.arguments || {})) {
+      decision += `### ${name} 的核心主张\n`;
+      const statements = (args || []).filter(a => a.type === 'statement').slice(0, 2);
+      for (const s of statements) {
+        decision += `- ${(s.text || s.content || '').slice(0, 150)}\n`;
       }
+      decision += `\n`;
     }
-    
-    // 建议行动
-    output += `## ✅ 建议行动\n`;
-    const rankings = forum.result.rankings || [forum.result.winner];
-    for (let i = 0; i < rankings.length; i++) {
-      output += `${i + 1}. 优先考虑${rankings[i].name}的方案\n`;
-    }
-    output += `\n`;
-    
-    // 风险提示
-    output += `## ⚠️ 风险提示\n`;
-    output += `- 本讨论结果仅供参考\n`;
-    output += `- 请结合实际情况做决策\n`;
-    output += `- 虚拟论坛的观点是模拟生成\n\n`;
-    
-    return output;
+    decision += `## 最终决策建议\n`;
+    decision += this.formatResultText(forum.result);
+    return decision;
   }
 
-  /**
-   * JSON格式
-   */
   formatJSON(forum) {
     return JSON.stringify({
+      id: forum.id,
       topic: forum.topic,
       mode: forum.mode,
       rounds: forum.rounds,
-      participants: forum.participants.map(p => p.name),
-      opening: forum.opening,
+      participants: (forum.participants || []).map(p => p.name),
       arguments: forum.arguments,
       scores: forum.scores,
       result: forum.result,
-      metadata: {
-        createdAt: new Date(forum.id).toISOString(),
-        duration: `${forum.rounds * 5}分钟（模拟）`
-      }
+      generatedAt: new Date().toISOString()
     }, null, 2);
-  }
-
-  /**
-   * 格式化开场
-   */
-  formatOpening(opening) {
-    let output = '';
-    output += `\`\`\`\n`;
-    output += `🎙️ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    output += `【主持人开场】\n`;
-    output += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    output += `\n`;
-    output += `${opening.content}\n`;
-    output += `\n`;
-    output += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    output += `\`\`\`\n\n`;
-    return output;
-  }
-
-  /**
-   * 格式化一轮
-   */
-  formatRound(round, participantCount) {
-    let output = '';
-    const border = '─'.repeat(50);
-    
-    output += `\n📌 第${round.number}轮 ${border}\n\n`;
-    
-    for (const exchange of round.exchanges) {
-      const emoji = this.getEmoji(exchange.type);
-      const speaker = this.bold(exchange.speaker);
-      
-      output += `${emoji} ${speaker}\n`;
-      
-      // 根据类型调整格式
-      if (exchange.type === 'question') {
-        output += `   └─ ${exchange.content}\n\n`;
-      } else if (exchange.type === 'answer') {
-        output += `   └─ ${exchange.content}\n\n`;
-      } else if (exchange.type === 'challenge') {
-        output += `   ⚔️ ${exchange.content}\n\n`;
-      } else if (exchange.type === 'rebuttal') {
-        output += `   🛡️ ${exchange.content}\n\n`;
-      } else {
-        output += `   ${exchange.content}\n\n`;
-      }
-    }
-    
-    return output;
-  }
-
-  /**
-   * 格式化结果
-   */
-  formatResult(result) {
-    let output = '';
-    const border = '═'.repeat(50);
-    
-    output += `\n${border}\n`;
-    output += `🏆 【最终结果】\n`;
-    output += `${border}\n\n`;
-    output += this.formatResultText(result);
-    output += `\n`;
-    
-    return output;
-  }
-
-  /**
-   * 格式化结果文本
-   */
-  formatResultText(result) {
-    if (result.type === 'points') {
-      let text = `🥇 **胜者: ${result.winner}**\n\n`;
-      text += `📊 **得分榜:**\n`;
-      for (const r of result.rankings) {
-        const medal = r.rank === 1 ? '🥇' : r.rank === 2 ? '🥈' : '🥉';
-        text += `${medal} ${r.name}: ${r.score}分\n`;
-      }
-      return text;
-    } else if (result.type === 'vote') {
-      return `🗳️ **投票结果:** ${result.winner} 胜出\n`;
-    } else if (result.type === 'concession') {
-      return `🤝 **让步协议:**\n${result.concession}\n`;
-    } else if (result.type === 'consensus') {
-      let text = `✅ **达成共识:**\n`;
-      for (const point of result.consensusPoints) {
-        text += `- ${point}\n`;
-      }
-      text += `\n⚡ **保留分歧:**\n`;
-      for (const point of result.divergencePoints) {
-        text += `- ${point}\n`;
-      }
-      return text;
-    }
-    return '';
-  }
-
-  /**
-   * 获取表情符号
-   */
-  getEmoji(type) {
-    const emojis = {
-      statement: '💬',
-      question: '❓',
-      answer: '💡',
-      challenge: '⚔️',
-      rebuttal: '🛡️',
-      argument: '📣',
-      insight: '💎',
-      analysis: '📊',
-      opening: '🎙️',
-      summary: '📋'
-    };
-    return emojis[type] || '•';
-  }
-
-  /**
-   * 加粗
-   */
-  bold(text) {
-    return `**${text}**`;
   }
 }
 

@@ -1,257 +1,243 @@
 /**
- * 博弈论增强的子代理竞技场
- * Game-Theory Enhanced Subagent Arena (v3.5)
+ * 虚拟论坛 - 博弈论增强子代理竞技场
+ * Game Theory Enhanced Subagent Arena v3.5
  * 
- * 集成v2.0子代理模式与v3.5博弈论引擎
- * 让AI辩论者基于博弈论最优策略进行辩论
+ * [P0 FIX] 补全 index.js 中引用但缺失的文件
+ * 
+ * 博弈论在辩论中的作用：
+ * - discountFactor: 影响参与者的耐心程度（越低越急于达成共识）
+ * - outsideOption: 参与者的 BATNA（最佳替代方案），影响让步意愿
+ * - reputationType: 影响其他参与者对其策略的预判
+ * - priorBeliefs: 贝叶斯更新，根据对方行为更新对其类型的判断
  */
 
-const SubagentArena = require('../subagent-arena');
-const { AdvancedGameTheoryEngine } = require('./advanced');
+const SubagentArena = require('../subagent-arena.js');
+const { DEFAULTS } = require('../shared-config.js');
 
 class GameTheorySubagentArena extends SubagentArena {
   constructor(skillsDir = null) {
     super(skillsDir);
-    this.gtEngine = new AdvancedGameTheoryEngine();
-    this.gameTheoryContext = null;
-    this.strategyAdvice = {};
-    this.equilibriumTracking = [];
+    this.gameState = null;
   }
 
   /**
-   * 初始化博弈论增强竞技场
+   * 初始化博弈论增强的竞技场
    */
   async initArenaWithGameTheory(config) {
-    // 1. 初始化基础竞技场
+    // 先执行基础初始化
     await this.initArena(config);
-    
-    // 2. 运行博弈论分析
-    console.log('🎲 运行博弈论分析...');
-    
-    this.gameTheoryContext = await this.gtEngine.comprehensiveAnalysis(
-      config.topic,
-      config.participants.map(p => p.name),
-      {
-        discountFactors: config.discountFactors || this.inferDiscountFactors(config.participants),
-        outsideOptions: config.outsideOptions || {},
-        totalValue: config.totalValue || 100,
-        types: config.types,
-        priorBeliefs: config.priorBeliefs,
-        reputationTypes: config.reputationTypes,
-        horizon: config.rounds,
-        auction: config.mode === 'decision',
-        reputationAnalysis: config.rounds > 5
-      }
-    );
-    
-    console.log('✓ 博弈论分析完成');
-    console.log(`  检测到的博弈类型: ${this.gameTheoryContext.toolsUsed.join(', ')}`);
-    
-    // 3. 生成策略建议（异步）
-    await this.generateStrategyAdviceForAll(config.participants);
-    
+
+    const gtDefaults = DEFAULTS.gameTheory;
+    const {
+      discountFactors = {},
+      outsideOptions = {},
+      totalValue = gtDefaults.totalValue,
+      types = {},
+      priorBeliefs = {},
+      reputationTypes = {}
+    } = config;
+
+    // 初始化博弈论状态
+    this.gameState = {
+      totalValue,
+      round: 0,
+      participants: {}
+    };
+
+    for (const p of this.arena.participants) {
+      this.gameState.participants[p.name] = {
+        discountFactor: discountFactors[p.name] || gtDefaults.defaultDiscountFactor,
+        outsideOption: outsideOptions[p.name] || gtDefaults.defaultOutsideOption,
+        type: types[p.name] || 'unknown',
+        reputationType: reputationTypes[p.name] || gtDefaults.defaultReputationType,
+        beliefs: priorBeliefs[p.name] || {},
+        concessions: [],
+        currentOffer: null,
+        utility: 0
+      };
+    }
+
+    console.log('🎲 博弈论参数已初始化:');
+    for (const [name, state] of Object.entries(this.gameState.participants)) {
+      console.log(` ${name}: δ=${state.discountFactor}, BATNA=${state.outsideOption}, 声誉=${state.reputationType}`);
+    }
+
     return this.arena;
   }
 
   /**
-   * 推断折现因子
+   * 计算参与者在当前轮次的折扣效用
+   * U_i(t) = δ^t * value - outsideOption
    */
-  inferDiscountFactors(participants) {
-    const factors = {};
-    for (const p of participants) {
-      let delta = 0.9;
-      if (p.name.includes('巴菲特')) delta = 0.95;
-      else if (p.name.includes('马斯克')) delta = 0.85;
-      else if (p.name.includes('特朗普')) delta = 0.8;
-      factors[p.name] = delta;
-    }
-    return factors;
+  calculateDiscountedUtility(participantName, value) {
+    const state = this.gameState.participants[participantName];
+    if (!state) return 0;
+
+    const discounted = Math.pow(state.discountFactor, this.gameState.round) * value;
+    return Math.max(discounted, state.outsideOption);
   }
 
   /**
-   * 生成所有参与者的策略建议
+   * 判断参与者是否应该让步
+   * 当折扣效用接近外部选项时，倾向让步
    */
-  async generateStrategyAdviceForAll(participants) {
-    for (const p of participants) {
-      this.strategyAdvice[p.name] = await this.generateStrategyAdvice(p);
-    }
+  shouldConcede(participantName) {
+    const state = this.gameState.participants[participantName];
+    if (!state) return false;
+
+    const currentUtility = this.calculateDiscountedUtility(
+      participantName,
+      this.gameState.totalValue / Object.keys(this.gameState.participants).length
+    );
+
+    // 当效用低于外部选项的 1.2 倍时，倾向让步
+    return currentUtility < state.outsideOption * 1.2;
   }
 
   /**
-   * 为单个参与者生成策略建议
+   * 贝叶斯更新：根据对方行为更新信念
    */
-  async generateStrategyAdvice(participant) {
-    const advice = {
-      participant: participant.name,
-      recommendations: []
-    };
-    
-    const gt = this.gameTheoryContext;
-    
-    // 讨价还价建议
-    if (gt.results.bargaining?.rubinstein) {
-      const rubinstein = gt.results.bargaining.rubinstein;
-      const isProposer = rubinstein.proposer.name === participant.name;
-      const share = isProposer ? rubinstein.proposer.share : rubinstein.responder.share;
-      
-      advice.recommendations.push({
-        type: 'bargaining',
-        priority: 'high',
-        content: `你的均衡份额: ${(share * 100).toFixed(1)}%`,
-        action: share > 0.5 ? '开局强势' : '寻求合作妥协',
-        constraint: rubinstein.constrained && rubinstein.constrainedBy.includes(participant.name)
-          ? '注意：外部选项约束起作用'
-          : null
-      });
+  updateBeliefs(observerName, targetName, observedAction) {
+    const observer = this.gameState.participants[observerName];
+    if (!observer || !observer.beliefs[targetName]) return;
+
+    const beliefs = observer.beliefs[targetName];
+
+    // 简化的贝叶斯更新
+    if (observedAction === 'aggressive') {
+      beliefs.hardliner = Math.min(0.95, (beliefs.hardliner || 0.5) * 1.3);
+      beliefs.cooperative = Math.max(0.05, (beliefs.cooperative || 0.5) * 0.7);
+    } else if (observedAction === 'concede') {
+      beliefs.hardliner = Math.max(0.05, (beliefs.hardliner || 0.5) * 0.7);
+      beliefs.cooperative = Math.min(0.95, (beliefs.cooperative || 0.5) * 1.3);
     }
-    
-    // 重复博弈建议
-    if (gt.results.repeated?.triggerStrategies?.grimTrigger?.cooperationCondition?.condition) {
-      const condition = gt.results.repeated.triggerStrategies.grimTrigger.cooperationCondition;
-      advice.recommendations.push({
-        type: 'repeated',
-        priority: 'high',
-        content: '采用冷酷触发策略可以维持合作',
-        detail: `阈值 δ ≥ ${condition.threshold}, 当前 δ = ${condition.currentDelta.toFixed(2)}`,
-        warning: '一旦背叛将永久失去合作机会'
-      });
-    }
-    
-    // 信号博弈建议
-    if (gt.results.signaling?.equilibria?.separating > 0) {
-      advice.recommendations.push({
-        type: 'signaling',
-        priority: 'medium',
-        content: '存在分离均衡，可以通过信号传递真实类型',
-        action: '选择高成本信号以证明高类型'
-      });
-    }
-    
-    return advice;
-  }
 
-  /**
-   * 构建博弈论增强的辩论者提示
-   */
-  buildGameTheoryEnhancedPrompt(participant, roundNumber) {
-    const basePrompt = this.buildDebaterSystemPrompt(participant);
-    const advice = this.strategyAdvice[participant.name];
-    
-    const gameTheorySection = `
-
-🎲 博弈论策略指导（第${roundNumber}轮）:
-
-${advice.recommendations.map(r => `
-【${r.type.toUpperCase()}】
-建议: ${r.content}
-行动: ${r.action || r.warning || '根据情况灵活应对'}
-`).join('\n')}
-
-当前均衡状态:
-${this.describeCurrentEquilibrium()}
-
-请记住:
-1. 你的目标是最大化长期收益，不仅是当前轮次
-2. 考虑对手可能的策略和反应
-3. 维护你的声誉，它会影响下轮谈判力
-`;
-    
-    return basePrompt + gameTheorySection;
-  }
-
-  /**
-   * 描述当前均衡状态
-   */
-  describeCurrentEquilibrium() {
-    const gt = this.gameTheoryContext;
-    let description = '';
-    
-    if (gt.results.bargaining?.rubinstein) {
-      const r = gt.results.bargaining.rubinstein;
-      description += `- Rubinstein均衡: ${r.proposer.name}应得${(r.proposer.share * 100).toFixed(0)}%, ${r.responder.name}应得${(r.responder.share * 100).toFixed(0)}%\n`;
-    }
-    
-    if (gt.results.repeated?.folkTheorem?.cooperationPossibility) {
-      description += `- 合作可持续（满足民间定理条件）\n`;
-    }
-    
-    return description || '- 均衡分析进行中';
-  }
-
-  /**
-   * 执行一轮辩论（博弈论增强版）
-   */
-  async executeRoundWithGameTheory(roundNumber, debateContext) {
-    // 1. 更新博弈论上下文
-    this.updateGameTheoryContext(roundNumber, debateContext);
-    
-    // 2. 获取标准轮次配置
-    const roundConfig = this.getRoundConfig(roundNumber);
-    
-    // 3. 为每个消息添加博弈论指导
-    for (const msg of roundConfig.messages) {
-      const participant = this.arena.participants.find(p => p.name === msg.to);
-      if (participant) {
-        msg.prompt = this.buildGameTheoryEnhancedPrompt(participant, roundNumber);
-      }
-    }
-    
-    // 4. 记录均衡状态
-    this.equilibriumTracking.push({
-      round: roundNumber,
-      equilibrium: this.getCurrentEquilibriumState(),
-      advice: this.strategyAdvice
-    });
-    
-    return roundConfig;
-  }
-
-  /**
-   * 更新博弈论上下文
-   */
-  updateGameTheoryContext(roundNumber, context) {
-    // 根据实际辩论进展更新信念和策略建议
-    if (this.gameTheoryContext.results.signaling && context.observedActions) {
-      // 更新信念
-      for (const [player, action] of Object.entries(context.observedActions)) {
-        // 贝叶斯更新...
+    // 归一化
+    const total = Object.values(beliefs).reduce((s, v) => s + v, 0);
+    if (total > 0) {
+      for (const key of Object.keys(beliefs)) {
+        beliefs[key] /= total;
       }
     }
   }
 
   /**
-   * 获取当前均衡状态
+   * 构建博弈论增强的系统提示
+   * 在基础提示上附加博弈论策略指导
    */
-  getCurrentEquilibriumState() {
-    return {
-      timestamp: Date.now(),
-      recommendations: this.gameTheoryContext.recommendations
-    };
+  buildDebaterSystemPrompt(participant) {
+    const basePrompt = super.buildDebaterSystemPrompt(participant);
+    const state = this.gameState?.participants[participant.name];
+
+    if (!state) return basePrompt;
+
+    const shouldConcede = this.shouldConcede(participant.name);
+    const utility = this.calculateDiscountedUtility(
+      participant.name,
+      this.gameState.totalValue / Object.keys(this.gameState.participants).length
+    );
+
+    let strategyHint = '';
+    if (shouldConcede) {
+      strategyHint = `
+【策略提示】当前局势对你不利（效用=${utility.toFixed(1)}，接近你的底线=${state.outsideOption}）。
+你可以考虑：
+- 做出有条件的让步
+- 提出折中方案
+- 强调共同利益`;
+    } else {
+      strategyHint = `
+【策略提示】当前局势对你有利（效用=${utility.toFixed(1)}，远高于底线=${state.outsideOption}）。
+你可以考虑：
+- 坚持核心立场
+- 提出更高要求
+- 用数据和案例强化论点`;
+    }
+
+    return basePrompt + '\n' + strategyHint;
   }
 
   /**
-   * 生成博弈论增强的报告
+   * 重写 runDebate，在每轮后更新博弈状态
    */
-  generateGameTheoryReport() {
-    const baseReport = this.generateReport('report');
-    const gtReport = this.gtEngine.generateDebateReport(this.gameTheoryContext);
-    
-    return `
-${baseReport}
+  async runDebate() {
+    if (!this.gameState) {
+      throw new Error('博弈论状态未初始化，请先调用 initArenaWithGameTheory()');
+    }
 
-🎲 博弈论深度分析
-==================
+    // 保存原始的 onRoundComplete
+    const originalCallback = this.onRoundComplete;
 
-${gtReport.summary.keyFindings.map(f => `• ${f}`).join('\n')}
+    this.onRoundComplete = (round, speeches) => {
+      // 更新博弈轮次
+      this.gameState.round = round;
 
-策略建议回顾:
-${gtReport.strategicGuidance.shortTerm.map(s => `短期: ${s.content}`).join('\n')}
-${gtReport.strategicGuidance.mediumTerm.map(s => `中期: ${s.content}`).join('\n')}
-${gtReport.strategicGuidance.longTerm.map(s => `长期: ${s.content}`).join('\n')}
+      // 分析发言行为并更新信念
+      for (const speech of speeches) {
+        const action = this.classifyAction(speech.content);
+        for (const otherName of Object.keys(this.gameState.participants)) {
+          if (otherName !== speech.speaker) {
+            this.updateBeliefs(otherName, speech.speaker, action);
+          }
+        }
+      }
 
-均衡演化:
-${this.equilibriumTracking.map(e => `第${e.round}轮: ${e.equilibrium.recommendations?.length || 0}条建议`).join('\n')}
-`;
+      // 调用原始回调
+      if (typeof originalCallback === 'function') {
+        originalCallback(round, speeches);
+      }
+    };
+
+    return await super.runDebate();
+  }
+
+  /**
+   * 简单分类发言行为
+   * @param {string} content - 发言内容
+   * @returns {string} 'aggressive' | 'concede' | 'neutral'
+   */
+  classifyAction(content) {
+    if (!content) return 'neutral';
+
+    const aggressiveKeywords = ['反对', '错误', '不可能', '荒谬', '完全不同意', '必须', '绝对'];
+    const concedeKeywords = ['同意', '有道理', '让步', '折中', '妥协', '可以接受', '共同点'];
+
+    const aggressiveCount = aggressiveKeywords.filter(k => content.includes(k)).length;
+    const concedeCount = concedeKeywords.filter(k => content.includes(k)).length;
+
+    if (aggressiveCount > concedeCount) return 'aggressive';
+    if (concedeCount > aggressiveCount) return 'concede';
+    return 'neutral';
+  }
+
+  /**
+   * 获取博弈论状态报告
+   */
+  getGameTheoryReport() {
+    if (!this.gameState) return '博弈论状态未初始化';
+
+    let report = '🎲 博弈论状态报告\n';
+    report += `═══════════════════════\n`;
+    report += `总价值池: ${this.gameState.totalValue}\n`;
+    report += `当前轮次: ${this.gameState.round}\n\n`;
+
+    for (const [name, state] of Object.entries(this.gameState.participants)) {
+      const utility = this.calculateDiscountedUtility(
+        name, this.gameState.totalValue / Object.keys(this.gameState.participants).length
+      );
+      report += `【${name}】\n`;
+      report += ` 折扣因子: ${state.discountFactor}\n`;
+      report += ` 外部选项(BATNA): ${state.outsideOption}\n`;
+      report += ` 当前效用: ${utility.toFixed(1)}\n`;
+      report += ` 声誉类型: ${state.reputationType}\n`;
+      report += ` 应该让步: ${this.shouldConcede(name) ? '是 ⚠️' : '否'}\n`;
+      if (Object.keys(state.beliefs).length > 0) {
+        report += ` 信念: ${JSON.stringify(state.beliefs)}\n`;
+      }
+      report += `\n`;
+    }
+
+    return report;
   }
 }
 
