@@ -60,13 +60,22 @@ class BayesianGame {
 
   /**
    * 计算类型组合的概率
+   * 
+   * 使用平滑处理避免0概率问题
    */
   calculateProbability(typeCombination) {
+    const MIN_PROBABILITY = 0.001; // 最小概率阈值
+    
     let prob = 1;
     for (const { player, type } of typeCombination) {
-      prob *= this.priorBeliefs[`${player}-${type}`] || 0.5;
+      const prior = this.priorBeliefs[`${player}-${type}`];
+      // 如果未定义或为0，使用最小概率
+      const p = (prior !== undefined && prior > 0) ? prior : MIN_PROBABILITY;
+      prob *= p;
     }
-    return prob;
+    
+    // 保证返回正数，避免后续除零
+    return Math.max(prob, 1e-10);
   }
 
   /**
@@ -94,30 +103,34 @@ class BayesianGame {
    * 
    * P(类型|行动) = P(行动|类型) * P(类型) / P(行动)
    * 
-   * @param {string} observer - 观察者
-   * @param {string} observedPlayer - 被观察的玩家
-   * @param {string} observedAction - 观察到的行动
-   * @param {object} priorBeliefs - 先验信念
+   * 添加了防止除零的保护
    */
   bayesianUpdate(observer, observedPlayer, observedAction, priorBeliefs) {
     const observedTypes = this.types[observedPlayer];
     const posteriorBeliefs = {};
+    const MIN_PROBABILITY = 0.001;
     
     // 计算分母 P(行动)
     let totalProbability = 0;
     for (const type of observedTypes) {
       const likelihood = this.likelihoodOfAction(observedPlayer, type, observedAction);
-      const prior = priorBeliefs[`${observedPlayer}-${type}`] || 0.5;
+      const prior = (priorBeliefs[`${observedPlayer}-${type}`] !== undefined) 
+        ? priorBeliefs[`${observedPlayer}-${type}`] 
+        : MIN_PROBABILITY;
       totalProbability += likelihood * prior;
     }
+    
+    // 防止除零
+    totalProbability = Math.max(totalProbability, 1e-10);
     
     // 计算后验 P(类型|行动)
     for (const type of observedTypes) {
       const likelihood = this.likelihoodOfAction(observedPlayer, type, observedAction);
-      const prior = priorBeliefs[`${observedPlayer}-${type}`] || 0.5;
+      const prior = (priorBeliefs[`${observedPlayer}-${type}`] !== undefined) 
+        ? priorBeliefs[`${observedPlayer}-${type}`] 
+        : MIN_PROBABILITY;
       
-      posteriorBeliefs[`${observedPlayer}-${type}`] = 
-        totalProbability > 0 ? (likelihood * prior) / totalProbability : prior;
+      posteriorBeliefs[`${observedPlayer}-${type}`] = (likelihood * prior) / totalProbability;
     }
     
     return posteriorBeliefs;

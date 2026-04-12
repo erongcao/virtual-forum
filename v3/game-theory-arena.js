@@ -47,8 +47,8 @@ class GameTheorySubagentArena extends SubagentArena {
     console.log('✓ 博弈论分析完成');
     console.log(`  检测到的博弈类型: ${this.gameTheoryContext.toolsUsed.join(', ')}`);
     
-    // 3. 生成策略建议
-    this.generateStrategyAdviceForAll(config.participants);
+    // 3. 生成策略建议（异步）
+    await this.generateStrategyAdviceForAll(config.participants);
     
     return this.arena;
   }
@@ -69,18 +69,18 @@ class GameTheorySubagentArena extends SubagentArena {
   }
 
   /**
-   * 生成策略建议
+   * 生成所有参与者的策略建议
    */
-  generateStrategyAdviceForAll(participants) {
+  async generateStrategyAdviceForAll(participants) {
     for (const p of participants) {
-      this.strategyAdvice[p.name] = this.generateStrategyAdvice(p);
+      this.strategyAdvice[p.name] = await this.generateStrategyAdvice(p);
     }
   }
 
   /**
    * 为单个参与者生成策略建议
    */
-  generateStrategyAdvice(participant) {
+  async generateStrategyAdvice(participant) {
     const advice = {
       participant: participant.name,
       recommendations: []
@@ -98,17 +98,32 @@ class GameTheorySubagentArena extends SubagentArena {
         type: 'bargaining',
         priority: 'high',
         content: `你的均衡份额: ${(share * 100).toFixed(1)}%`,
-        action: share > 0.5 ? '开局强势' : '寻求合作妥协'
+        action: share > 0.5 ? '开局强势' : '寻求合作妥协',
+        constraint: rubinstein.constrained && rubinstein.constrainedBy.includes(participant.name)
+          ? '注意：外部选项约束起作用'
+          : null
       });
     }
     
     // 重复博弈建议
     if (gt.results.repeated?.triggerStrategies?.grimTrigger?.cooperationCondition?.condition) {
+      const condition = gt.results.repeated.triggerStrategies.grimTrigger.cooperationCondition;
       advice.recommendations.push({
         type: 'repeated',
         priority: 'high',
-        content: '采用冷酷触发策略维持合作',
+        content: '采用冷酷触发策略可以维持合作',
+        detail: `阈值 δ ≥ ${condition.threshold}, 当前 δ = ${condition.currentDelta.toFixed(2)}`,
         warning: '一旦背叛将永久失去合作机会'
+      });
+    }
+    
+    // 信号博弈建议
+    if (gt.results.signaling?.equilibria?.separating > 0) {
+      advice.recommendations.push({
+        type: 'signaling',
+        priority: 'medium',
+        content: '存在分离均衡，可以通过信号传递真实类型',
+        action: '选择高成本信号以证明高类型'
       });
     }
     

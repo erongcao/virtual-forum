@@ -14,8 +14,46 @@
 class ExtensiveFormGame {
   constructor(config) {
     this.players = config.players;
-    this.root = config.root; // 博弈树根节点
+    this.root = config.root;
     this.payoffFunction = config.payoffFunction;
+    this.nodeMap = new Map(); // 节点映射表
+    
+    // 初始化时构建节点映射
+    if (this.root) {
+      this.buildNodeMap(this.root);
+    }
+  }
+  
+  /**
+   * 构建节点映射表
+   */
+  buildNodeMap(node) {
+    if (!node) return;
+    this.nodeMap.set(node.id, node);
+    
+    for (const action of node.actions || []) {
+      if (action.nextNodeId) {
+        // 如果子节点已存在，直接引用
+        // 否则稍后通过getNode获取
+      }
+      if (action.child) {
+        this.buildNodeMap(action.child);
+      }
+    }
+  }
+
+  /**
+   * 通过ID获取节点
+   */
+  getNode(id) {
+    return this.nodeMap.get(id) || null;
+  }
+  
+  /**
+   * 添加节点到映射表
+   */
+  addNode(node) {
+    this.nodeMap.set(node.id, node);
   }
 
   /**
@@ -443,12 +481,18 @@ class ExtensiveFormGame {
   }
 
   /**
-   * 辅助方法
+   * 通过ID获取节点
+   * 使用预构建的节点映射表
    */
   getNode(id) {
-    // 简化的节点查找
-    // 实际实现需要维护节点映射
-    return null;
+    return this.nodeMap.get(id) || null;
+  }
+  
+  /**
+   * 添加节点到映射表
+   */
+  addNode(node) {
+    this.nodeMap.set(node.id, node);
   }
 
   cartesianProduct(obj) {

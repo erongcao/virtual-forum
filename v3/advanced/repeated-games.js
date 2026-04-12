@@ -98,37 +98,53 @@ class RepeatedGameAnalyzer {
   /**
    * 验证冷酷触发的合作条件
    * 
-   * 合作收益 ≥ 背叛一次性收益 + 折现后的惩罚收益
+   * 正确的合作条件 (Osborne 第8章):
+   * R ≥ (1-δ)*T + δ*P
    * 
-   * 即: (1-δ) * 合作价值 ≥ 背叛诱惑
+   * 即: δ ≥ (T-R)/(T-P)
+   * 
+   * 其中:
+   * R = 相互合作收益 (Reward)
+   * T = 背叛诱惑 (Temptation) 
+   * P = 相互背叛收益 (Punishment)
+   * S = 被背叛收益 (Sucker) - 未使用但重要
    */
   checkGrimTriggerCooperation() {
-    // 假设阶段博弈是囚徒困境
-    const cooperatePayoff = 3; // R
-    const defectPayoff = 5;    // T (诱惑)
-    const punishmentPayoff = 1; // P (惩罚)
+    // 囚徒困境收益 (T>R>P>S)
+    const R = 3;  // Reward: 相互合作
+    const T = 5;  // Temptation: 背叛而对方合作
+    const P = 1;  // Punishment: 相互背叛
+    const S = 0;  // Sucker: 合作而对方背叛
     
     const delta = this.discountFactor;
     
-    // 合作的价值流: 3 + 3δ + 3δ² + ... = 3/(1-δ)
-    const cooperationValue = cooperatePayoff / (1 - delta);
+    // 正确的阈值: δ ≥ (T-R)/(T-P)
+    const threshold = (T - R) / (T - P);
     
-    // 背叛的价值: 5 + 1δ + 1δ² + ... = 5 + δ/(1-δ)
-    const defectionValue = defectPayoff + delta * punishmentPayoff / (1 - delta);
+    // 也可以使用更完整的公式考虑S:
+    // 完整条件: R/(1-δ) ≥ T + δ*P/(1-δ)  →  δ ≥ (T-R)/(T-P)
+    const condition = delta >= threshold;
     
-    const condition = cooperationValue >= defectionValue;
-    const threshold = (defectPayoff - cooperatePayoff) / (defectPayoff - punishmentPayoff);
+    // 计算合作vs背叛的净现值差异
+    const cooperationNPV = R / (1 - delta);
+    const defectionNPV = T + delta * P / (1 - delta);
+    const netBenefit = cooperationNPV - defectionNPV;
     
     return {
       condition,
-      threshold: threshold.toFixed(3),
+      threshold: threshold.toFixed(4),
       currentDelta: delta,
       explanation: condition 
-        ? `δ=${delta} ≥ ${threshold.toFixed(3)}, 冷酷触发可以维持合作`
-        : `δ=${delta} < ${threshold.toFixed(3)}, 背叛诱惑太大，合作不可维持`,
+        ? `δ=${delta.toFixed(4)} ≥ ${threshold.toFixed(4)}: 冷酷触发可以维持合作。合作净收益=${netBenefit.toFixed(2)}`
+        : `δ=${delta.toFixed(4)} < ${threshold.toFixed(4)}: 背叛诱惑太大，合作不可维持`,
       
-      // 合作剩余
-      cooperationSurplus: cooperationValue - defectionValue
+      // 详细分解
+      detail: {
+        cooperationNPV: cooperationNPV.toFixed(2),
+        defectionNPV: defectionNPV.toFixed(2),
+        netBenefit: netBenefit.toFixed(2),
+        requiredDelta: threshold.toFixed(4)
+      }
     };
   }
 

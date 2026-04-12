@@ -27,38 +27,77 @@ class AlternatingOfferBargaining {
    * - 提议者份额: (1 - δ_2) / (1 - δ_1 * δ_2)
    * - 回应者份额: δ_2 * (1 - δ_1) / (1 - δ_1 * δ_2)
    * 
-   * 直觉：更耐心的参与者获得更大份额
+   * 添加了外部选项约束检查 (Binmore, Rubinstein & Wolinsky 1986)
    */
   calculateRubinsteinEquilibrium(proposer, responder) {
     const delta1 = this.discountFactors[proposer] || 0.9;
     const delta2 = this.discountFactors[responder] || 0.9;
+    const outside1 = this.outsideOptions[proposer] || 0;
+    const outside2 = this.outsideOptions[responder] || 0;
     
-    // 提议者均衡份额
-    const proposerShare = (1 - delta2) / (1 - delta1 * delta2);
-    // 回应者均衡份额
-    const responderShare = (delta2 * (1 - delta1)) / (1 - delta1 * delta2);
+    // 基础Rubinstein解
+    let proposerShare = (1 - delta2) / (1 - delta1 * delta2);
+    let responderShare = (delta2 * (1 - delta1)) / (1 - delta1 * delta2);
+    
+    // 转换为绝对值
+    let proposerValue = proposerShare * this.totalValue;
+    let responderValue = responderShare * this.totalValue;
+    
+    // 检查外部选项约束
+    // 如果一方的均衡收益低于外部选项，该方会选择退出
+    const constrained = [];
+    
+    if (proposerValue < outside1) {
+      // 提议者不会接受低于外部选项的份额
+      proposerValue = outside1;
+      responderValue = this.totalValue - outside1;
+      proposerShare = outside1 / this.totalValue;
+      responderShare = responderValue / this.totalValue;
+      constrained.push(proposer);
+    } else if (responderValue < outside2) {
+      // 回应者不会接受低于外部选项的份额
+      // 注意：在Rubinstein模型中，回应者实际上在第一轮没有提议权
+      // 这里简化为提议者必须提供至少outside2给回应者
+      responderValue = outside2;
+      proposerValue = this.totalValue - outside2;
+      responderShare = outside2 / this.totalValue;
+      proposerShare = proposerValue / this.totalValue;
+      constrained.push(responder);
+    }
     
     return {
-      type: 'Rubinstein Equilibrium',
+      type: constrained.length > 0 ? 'Constrained Rubinstein Equilibrium' : 'Rubinstein Equilibrium',
+      constrained: constrained.length > 0,
+      constrainedBy: constrained,
+      
       proposer: {
         name: proposer,
         share: proposerShare,
-        value: proposerShare * this.totalValue,
-        discountFactor: delta1
+        value: proposerValue,
+        discountFactor: delta1,
+        outsideOption: outside1,
+        constraintBinding: constrained.includes(proposer)
       },
+      
       responder: {
         name: responder,
         share: responderShare,
-        value: responderShare * this.totalValue,
-        discountFactor: delta2
+        value: responderValue,
+        discountFactor: delta2,
+        outsideOption: outside2,
+        constraintBinding: constrained.includes(responder)
       },
-      agreementRound: 1, // 第1轮达成协议
+      
+      agreementRound: constrained.length > 0 ? '受外部选项影响' : 1,
       totalValue: this.totalValue,
       
       // 比较静态分析
       comparativeStatics: {
         patienceEffect: `δ_${proposer}↑ → ${proposer}份额↑`,
-        impatiencePenalty: `δ_${responder}↓ → ${responder}被迫接受更低份额`
+        impatiencePenalty: `δ_${responder}↓ → ${responder}被迫接受更低份额`,
+        outsideOptionEffect: constrained.length > 0 
+          ? `外部选项约束起作用: ${constrained.join(', ')}`
+          : '无外部选项约束'
       }
     };
   }
