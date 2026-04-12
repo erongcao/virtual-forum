@@ -245,3 +245,96 @@ virtual-forum/
 - 不是真正的人物在思考
 - 结果应作为参考，不是真理
 - 胜负判定是游戏化的，帮助结构化思考
+
+## v3.6 行为经济学增强版 (2026-04-12)
+
+基于三本经典著作实现的行为经济学模块：
+- **前景理论** (Kahneman & Tversky, 1979) - 风险决策分析
+- **有限理性模型** (Simon & Jones, 1999) - 认知限制与决策
+- **助推理论** (Thaler & Sunstein, 2008) - 选择架构设计
+
+### 新增核心模块
+
+```javascript
+const { BehavioralEconomicsSubagentArena } = require('./v3/behavioral-arena');
+
+const arena = new BehavioralEconomicsSubagentArena();
+await arena.initArenaWithBehavioralEconomics({
+  topic: "气候变化政策",
+  participants: [
+    { name: "环保主义者", position: "激进减排" },
+    { name: "经济学家", position: "成本效益平衡" }
+  ],
+  rounds: 5
+});
+```
+
+### 行为经济学功能
+
+#### 1. 前景理论引擎
+- **价值函数**: 收益凹函数(风险厌恶) vs 损失凸函数(风险寻求)
+- **概率加权**: 高估小概率，低估中高概率
+- **四折模式**: 解释彩票偏好、保险购买、确定性效应
+- **框架效应**: 增益框架 vs 损失框架的偏好逆转
+- **损失厌恶**: λ ≈ 2.25，损失影响是收益的2.25倍
+
+#### 2. 有限理性引擎
+- **满意化决策**: 寻找足够好的方案而非最优
+- **可得性启发**: 基于记忆可提取性判断概率
+- **代表性启发**: 基于相似性判断，忽视基础概率
+- **锚定调整**: 从初始值出发，调整不足
+- **双系统理论**: 系统1(快速直觉) vs 系统2(慢速理性)
+- **注意力模型**: 注意力作为稀缺资源的分配
+
+#### 3. 助推理论引擎
+- **选择架构**: 默认选项、排序效应、简化选择
+- **社会规范**: 利用从众心理和社会证明
+- **框架设计**: 增益/损失/社会框架的应用
+- **反馈机制**: 即时反馈、社会比较、游戏化
+- **承诺机制**: 软承诺到硬承诺的设计
+
+### 辩论中的应用
+
+#### 偏差检测
+```javascript
+const insights = arena.analyzeRoundBehavior(roundData);
+// 检测：损失厌恶、确定性效应、可得性偏差、锚定效应等
+```
+
+#### 策略建议
+```javascript
+const advice = arena.generateBehavioralAdvice(agentName, {
+  position: "支持",
+  opponentPosition: "反对",
+  topic: "议题",
+  audienceProfile: { riskAverse: true }
+});
+```
+
+#### 综合报告
+```javascript
+const report = arena.generateBehavioralReport();
+// 包含：博弈论分析 + 行为经济学洞察 + 综合策略建议
+```
+
+### 文件结构
+
+```
+v3/
+├── behavioral/               # 行为经济学模块
+│   ├── index.js             # 主集成模块
+│   ├── prospect-theory.js   # 前景理论引擎
+│   ├── bounded-rationality.js # 有限理性引擎
+│   └── nudge-theory.js      # 助推理论引擎
+├── behavioral-arena.js      # v3.6 行为经济学竞技场
+└── game-theory-arena.js     # v3.5 博弈论竞技场
+```
+
+### 理论来源
+
+1. **Kahneman, D., & Tversky, A. (1979)**. Prospect Theory: An Analysis of Decision under Risk. *Econometrica*, 47(2), 263-291.
+
+2. **Jones, B. D. (1999)**. Bounded Rationality. *Annual Review of Political Science*, 2, 297-321.
+
+3. **Thaler, R. H., & Sunstein, C. R. (2008)**. Nudge: Improving Decisions About Health, Wealth, and Happiness. Yale University Press.
+
