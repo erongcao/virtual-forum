@@ -26,6 +26,8 @@ const {
 } = require('./shared-config.js');
 const ContextManager = require('./context-manager.js');
 
+const ArgumentTracker = require('./argument-tracker.js');
+
 class SubagentArena {
   constructor(skillsDir = null) {
     this.skillsDir = skillsDir || getDefaultSkillsDir();
@@ -34,6 +36,7 @@ class SubagentArena {
     this.contextManager = null;
     this.isPaused = false;
     this.onRoundComplete = null; // 进度回调钩子
+    this.argumentTracker = new ArgumentTracker(); // [v3.5.2 FIX] 集成论点追踪器
   }
 
   /**
@@ -138,7 +141,7 @@ ${participant.skillContent || '（无可用背景）'}
 2. 体现你的性格、思维方式和表达风格
 3. 可以向对方提问或质疑
 4. 必要时引用具体数据或案例
-5. 每次发言控制在${DEFAULTS.minResponseLength}-${DEFAULTS.maxResponseLength}字
+5. 每次发言控制在 ${DEFAULTS.minResponseLength}-${DEFAULTS.maxResponseLength} 字
 
 重要：
 - 保持角色一致性
@@ -195,6 +198,9 @@ ${participant.skillContent || '（无可用背景）'}
           content: response,
           type: 'statement'
         });
+
+        // [v3.5.2 FIX] 记录到论点追踪器
+        this.argumentTracker.addArgument(participant.name, response, 'statement', round);
 
         this.arena.debateHistory.push({
           round,
