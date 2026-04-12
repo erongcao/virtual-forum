@@ -1,8 +1,8 @@
-# 虚拟论坛 Virtual Forum v3.5 🎭
+# 虚拟论坛 Virtual Forum v3.5.2 🎭
 
 > 让蒸馏的人物Skill就特定话题展开结构化辩论
 
-[![Version](https://img.shields.io/badge/version-3.5.0-blue.svg)](https://github.com/erongcao/virtual-forum)
+[![Version](https://img.shields.io/badge/version-3.5.2-blue.svg)](https://github.com/erongcao/virtual-forum)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D16.0.0-brightgreen.svg)](https://nodejs.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -146,7 +146,15 @@ OutputFormatter 测试
 
 ## 🐛 Bug修复历史
 
-### v3.5.0 (当前版本)
+### v3.5.2 (当前版本)
+
+| Bug | 严重性 | 修复内容 |
+|-----|--------|----------|
+| **模拟模式空壳** | 🔴 高 | `forum-engine.js` `runForum()` 完整实现 |
+| **ArgumentTracker断裂** | 🟠 中 | 子代理模式集成论点追踪 |
+| **package.json版本** | 🟡 中 | 版本号统一为3.5.2 |
+
+### v3.5.0 - v3.5.1
 
 | Bug | 严重性 | 修复内容 |
 |-----|--------|----------|
@@ -220,6 +228,6 @@ MIT License
 
 ---
 
-**版本**: v3.5.0  
+**版本**: v3.5.2  
 **最后更新**: 2026-04-12  
 **作者**: erongcao
