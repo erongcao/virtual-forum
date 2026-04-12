@@ -118,6 +118,36 @@ class VirtualForum {
   }
 
   /**
+   * ⚡ 快速启动子代理辩论（便捷方法）
+   * [P0 FIX] 添加缺失的 quickArena 方法
+   */
+  async quickArena(topic, participantNames, options = {}) {
+    const {
+      mode = 'adversarial',
+      rounds = 10,
+      moderatorStyle = 'provocative',
+      moderatorName = '巴菲特',
+      moderatorSkill = 'warren-buffett',
+      outputFormat = 'dialogue',
+      useBehavioralEconomics = false // 是否使用行为经济学增强
+    } = options;
+
+    const participants = participantNames.map(name => ({ name }));
+
+    if (useBehavioralEconomics) {
+      return this.launchBehavioralEconomicsArena({
+        topic, mode, rounds, participants,
+        moderatorName, moderatorSkill, moderatorStyle, outputFormat
+      });
+    }
+
+    return this.launchArena({
+      topic, mode, rounds, participants,
+      moderatorName, moderatorSkill, moderatorStyle, outputFormat
+    });
+  }
+
+  /**
    * 追踪论点
    */
   trackArguments(forum) {

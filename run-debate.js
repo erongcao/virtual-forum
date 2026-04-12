@@ -30,11 +30,16 @@ async function main() {
 
     console.log('\n' + result.output);
     
-    // 保存结果
+    // 保存结果（使用相对路径，避免硬编码）
     const fs = require('fs');
-    const outputPath = '/Users/caoyirong/obsidian/macairm2/虚拟论坛/2026-04-12-纽森vs特朗普-美国是否应该退出联合国-子代理版.md';
+    const path = require('path');
+    const outputDir = path.join(process.cwd(), 'output');
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+    const outputPath = path.join(outputDir, 'debate-result.md');
     fs.writeFileSync(outputPath, result.output);
-    console.log(`\n✅ 结果已保存到 Obsidian`);
+    console.log(`\n✅ 结果已保存到: ${outputPath}`);
     
   } catch (err) {
     console.error('❌ 错误:', err.message);

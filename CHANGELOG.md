@@ -5,6 +5,44 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [3.6.1] - 2026-04-13
+
+### 🧠 新增 - 行为经济学增强版
+
+#### 三大理论模块
+- **前景理论 (Prospect Theory)** - Kahneman & Tversky (1979)
+  - 价值函数、概率加权、四折模式
+  - 损失厌恶 (λ ≈ 2.25)、框架效应
+  
+- **有限理性 (Bounded Rationality)** - Simon & Jones (1999)
+  - 满意化决策、启发式与偏差
+  - 双系统理论、注意力模型
+  
+- **助推理论 (Nudge Theory)** - Thaler & Sunstein (2008)
+  - 选择架构、默认选项
+  - 社会规范、框架设计
+
+#### 新增文件
+- `v3/behavioral/` - 行为经济学模块目录
+- `v3/behavioral-arena.js` - 行为经济学竞技场
+- `v3/behavioral/README.md` - 详细文档
+
+#### 主入口集成
+- 新增 `launchBehavioralEconomicsArena()` 方法
+- 新增 `quickArena()` 便捷方法
+- 支持通过 `useBehavioralEconomics` 参数启用
+
+### 🔧 修复
+
+#### P0 级别 Bug（严重）
+- **quickArena 方法缺失** - `index.js`
+  - 问题: `run-debate.js` 调用不存在的方法
+  - 修复: 添加 `quickArena()` 便捷启动方法
+  
+- **硬编码路径** - `run-debate.js`
+  - 问题: 硬编码 `/Users/caoyirong/obsidian/...`
+  - 修复: 使用相对路径 `./output/`
+
 ## [3.5.0] - 2026-04-12
 
 ### 🎉 新增
