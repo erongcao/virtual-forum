@@ -11,7 +11,8 @@ const fs = require('fs');
 
 class SubagentArena {
   constructor(skillsDir = null) {
-    this.skillsDir = skillsDir || path.join(process.env.HOME || '/Users/caoyirong', '.openclaw', 'skills');
+    const { getDefaultSkillsDir } = require('./shared-config.js');
+    this.skillsDir = skillsDir || getDefaultSkillsDir();
     this.arena = null;
     this.debaterSessions = {};
   }

@@ -54,8 +54,8 @@ class ArgumentTracker {
       points: 0
     };
     
-    this.arguments.push(rebutral);
-    target.rebuttals.push(rebutral.id);
+    this.arguments.push(rebuttal);
+    target.rebuttals.push(rebuttal.id);
     target.isRebutted = true;
     
     // 计分
