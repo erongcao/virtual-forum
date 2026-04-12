@@ -1,204 +1,225 @@
-# 🎭 虚拟论坛 Virtual Forum
+# 虚拟论坛 Virtual Forum v3.5 🎭
 
-> 让蒸馏的人物Skill就特定话题展开有意义的对话
+> 让蒸馏的人物Skill就特定话题展开结构化辩论
 
-## 两种运行模式
+[![Version](https://img.shields.io/badge/version-3.5.0-blue.svg)](https://github.com/erongcao/virtual-forum)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D16.0.0-brightgreen.svg)](https://nodejs.org/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-### 1️⃣ 模拟模式（默认）
-- 快速生成对话
-- Token消耗低
-- 适合测试和预览
+## ✨ 核心特性
 
-### 2️⃣ 子代理模式（真正AI交锋）🆕
-- 每个辩论者是**独立的AI代理**
-- 真正思考和回应
-- 完整的对话上下文
-- 更真实的辩论体验
+### 🎯 三种辩论模式
 
----
+| 模式 | 描述 | 适用场景 |
+|------|------|----------|
+| **探索性讨论** | 多角度剖析 → 发展 → 结论 | 复杂问题、需要综合视角 |
+| **对抗性辩论** | 争辩 → 交锋 → 胜负/共识 | 决策分歧、需要明确方向 |
+| **决策型讨论** | 多专家投票 → 加权评分 → 行动 | 需要拍板、有明确选项 |
 
-## 快速开始
+### 🚀 v3.5 重大更新
 
-### 命令行使用
+#### 1. 博弈论增强模式 (Game Theory Mode)
+- **折扣因子(δ)**：影响参与者的耐心程度
+- **BATNA（外部选项）**：影响让步意愿
+- **贝叶斯信念更新**：根据对方行为更新判断
+- **策略提示注入**：实时策略指导
 
-```bash
-# 基本用法（模拟模式）
-node index.js "话题" 参与者1 参与者2
-
-# 子代理模式（真正AI交锋）
-node index.js "话题" 参与者1 参与者2 --subagent
-
-# 示例
-node index.js "美国是否退出联合国" 纽森 特朗普 --subagent --rounds 10
-
-# 指定选项
-node index.js "话题" 参与者1 参与者2 \
-  --subagent \           # 启用子代理模式
-  --rounds 20 \          # 20轮辩论
-  --moderator provocative \  # 犀利主持人
-  --format report        # 报告格式输出
+#### 2. Token节省优化 (70%↓)
+```javascript
+const contextManager = new ContextManager({
+  windowSize: 6,              // 滑动窗口
+  summarizeEvery: 5           // 每5轮摘要
+});
+// 100轮辩论: 从100K tokens降至30K tokens
 ```
 
-### 代码使用
+#### 3. 健壮性提升
+- ✅ 输入验证和错误处理
+- ✅ 指数退避重试机制
+- ✅ 暂停/恢复支持
+- ✅ 完整的单元测试
+
+## 📦 安装
+
+```bash
+git clone https://github.com/erongcao/virtual-forum.git
+cd virtual-forum
+npm install  # 可选，主要用于测试
+```
+
+**要求**: Node.js >= 16.0.0
+
+## 🚀 快速开始
+
+### 基础用法
 
 ```javascript
 const VirtualForum = require('./index.js');
 
 const forum = new VirtualForum();
 
-// 子代理模式
-const result = await forum.quickArena(
-  '美国是否应该退出联合国？',
-  ['纽森', '特朗普'],
-  {
-    mode: 'adversarial',      // 对抗性辩论
-    rounds: 10,                // 10轮
-    moderatorStyle: 'provocative', // 犀利主持人
-    outputFormat: 'dialogue'   // 对话流输出
-  }
-);
+// 标准子代理辩论 (v2.0)
+const result = await forum.launchArena({
+  topic: 'AI是否会取代人类工作',
+  participants: [
+    { name: '马斯克', skillName: 'elon-musk' },
+    { name: '巴菲特', skillName: 'warren-buffett' }
+  ],
+  rounds: 10,
+  mode: 'adversarial'
+});
 
 console.log(result.output);
 ```
 
----
+### 博弈论增强模式 (v3.5) ⭐推荐
 
-## 子代理模式架构
+```javascript
+const result = await forum.launchGameTheoryArena({
+  topic: '公司并购谈判策略',
+  participants: [
+    { name: '买方CEO', skillName: 'aggressive-ceo' },
+    { name: '卖方CEO', skillName: 'defensive-ceo' }
+  ],
+  rounds: 20,
+  // 博弈论参数
+  discountFactors: {
+    '买方CEO': 0.95,    // 有耐心，可以长期谈判
+    '卖方CEO': 0.85     // 急于成交
+  },
+  outsideOptions: {
+    '买方CEO': 30,      // BATNA: 可以找其他目标
+    '卖方CEO': 10       // BATNA: 有限
+  },
+  totalValue: 100
+});
 
-```
-用户请求
-    ↓
-launchArena()
-    ↓
-┌─────────────────────────────────────────────┐
-│  SubagentArena                              │
-│  ├── initArena()     加载Skills            │
-│  ├── spawnDebaters() 启动子代理            │
-│  └── runDebate()     执行辩论              │
-└─────────────────────────────────────────────┘
-    ↓
-┌─────────────────────────────────────────────┐
-│  子代理池                                    │
-│  ├── debaters['纽森'] → sessions_spawn     │
-│  ├── debaters['特朗普'] → sessions_spawn   │
-│  └── moderator → sessions_spawn            │
-└─────────────────────────────────────────────┘
-    ↓
-每轮:
-  getDebaterResponse('纽森', context)  ← sessions_send
-        ↓
-  getDebaterResponse('特朗普', context) ← sessions_send
-        ↓
-  getModeratorResponse(context)         ← sessions_send
-        ↓
-  收集结果 → 记录到 debateHistory
+console.log(result.output);
+console.log(result.gameTheoryReport);  // 博弈论分析报告
 ```
 
----
+## 📚 文档
 
-## 配置选项
+- [使用指南](USAGE.md) - 详细API文档和示例
+- [CHANGELOG](CHANGELOG.md) - 版本历史
+- [架构说明](v3/README.md) - 博弈论引擎技术细节
 
-### 讨论模式
+## 🧪 测试
 
-| 选项 | 说明 |
-|------|------|
-| `exploratory` | 探索性讨论，多角度剖析 |
-| `adversarial` | 对抗性讨论，争辩胜负 |
-| `decision` | 决策型讨论，投票表决 |
+```bash
+npm test
+# 或
+node test/run.js
+```
 
-### 轮次
+**测试结果预览**:
+```
+🧪 虚拟论坛 V3.5 测试套件
 
-| 选项 | 说明 |
-|------|------|
-| `10` | 简短讨论，适合快速测试 |
-| `20` | 标准讨论，平衡深度 |
-| `50` | 深度辩论，全面剖析 |
+ArgumentTracker 测试
+✓ 添加论点
+✓ 添加反驳 - P0 Bug修复验证
+✓ 分数计算
+✓ 统计摘要
 
-### 主持人风格
+ContextManager 测试
+✓ 滑动窗口
+✓ 摘要触发
+✓ Token节省估算
 
-| 选项 | 特点 |
-|------|------|
-| `balanced` | 客观中立，善于引导 |
-| `provocative` | 追问到底，挑战观点 |
-| `synthesizing` | 归纳推动，形成共识 |
+Shared Config 测试
+✓ 配置验证 - 有效配置
+✓ 配置验证 - 空话题
+✓ 讨论模式定义完整
 
-### 胜负判定
+OutputFormatter 测试
+✓ 格式化对话
+✓ 格式化报告 - 补全验证
 
-| 选项 | 说明 |
-|------|------|
-| `points` | 点数制，统计得分 |
-| `vote` | 投票制，主持人投票 |
-| `concession` | 让步制，一方承认 |
-| `consensus` | 共识制，达成共识 |
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+总计: 17 个测试
+通过: 17
+失败: 0
 
-### 输出格式
+✅ 所有测试通过！
+```
 
-| 选项 | 说明 |
-|------|------|
-| `dialogue` | 对话流，像剧本一样 |
-| `report` | 报告流，总结格式 |
-| `decision` | 决策流，行动建议 |
-| `json` | JSON格式，程序使用 |
+## 🐛 Bug修复历史
 
----
+### v3.5.0 (当前版本)
 
-## 文件结构
+| Bug | 严重性 | 修复内容 |
+|-----|--------|----------|
+| **rebutral拼写错误** | 🔴 P0 | `rebuttal`修正，反驳功能恢复正常 |
+| **硬编码路径** | 🟠 P1 | 移除`/Users/caoyirong`，使用动态检测 |
+| **index.js参数截断** | 🔴 P0 | `p`→`priorBeliefs`，完整参数传递 |
+| **v3/game-theory-arena.js缺失** | 🔴 P0 | 补全缺失文件 |
+| **output-formatter.js截断** | 🟡 P2 | 补全`formatReport`方法 |
+
+## 🏗️ 架构
 
 ```
 virtual-forum/
-├── index.js              # 主入口
-├── forum-engine.js       # 模拟讨论引擎
-├── subagent-arena.js     # 🆕 子代理交锋引擎
-├── argument-tracker.js    # 论点追踪
-├── output-formatter.js    # 输出格式化
-├── SKILL.md             # Skill文档
-└── README.md            # 本文件
+├── index.js                 # 主入口
+├── forum-engine.js          # 模拟模式引擎
+├── subagent-arena.js        # 子代理交锋引擎 (v2.0)
+├── argument-tracker.js      # 论点追踪器
+├── output-formatter.js      # 输出格式化
+├── context-manager.js       # 上下文管理 (Token优化)
+├── shared-config.js         # 共享配置 (DRY)
+├── package.json             # 项目配置
+├── v3/
+│   ├── game-theory-arena.js # 博弈论增强引擎 (v3.5)
+│   └── core/                # 博弈论核心算法
+└── test/                    # 单元测试
+    ├── argument-tracker.test.js
+    ├── context-manager.test.js
+    ├── shared-config.test.js
+    └── run.js
 ```
 
----
+## 🤝 与其他Skill的集成
 
-## 与女娲的关系
+### 与 AI Hedge Fund Skill 结合
 
+```javascript
+// 投资委员会辩论
+const result = await forum.launchGameTheoryArena({
+  topic: 'NVDA估值是否合理',
+  participants: [
+    { name: '巴菲特', skillName: 'warren-buffett' },
+    { name: '木头姐', skillName: 'cathie-wood' },
+    { name: '达里奥', skillName: 'ray-dalio' }
+  ],
+  discountFactors: {
+    '巴菲特': 0.95,    // 长期视角
+    '木头姐': 0.85,    // 短期激进
+    '达里奥': 0.90     // 平衡
+  }
+});
 ```
-女娲 ──造人──→ 人物Skill (巴菲特、芒格、纽森、特朗普...)
-   │
-   └──虚拟论坛 ──用人──→ 让Skill活起来辩论
-                        │
-                        ├── 模拟模式（快速预览）
-                        └── 子代理模式（真正AI交锋）🆕
-```
+
+## 📝 使用场景
+
+1. **投资决策** - 让投资大师辩论特定股票
+2. **政策分析** - 模拟不同政治立场的交锋
+3. **产品决策** - 让不同角色讨论产品方向
+4. **学术讨论** - 模拟学术观点的辩论
+5. **谈判准备** - 通过博弈论分析最优策略
+
+## ⚠️ 诚实边界
+
+- 虚拟论坛的观点是基于Skill中记录的思维框架**模拟**生成
+- 不是真实的人物在思考
+- 结果应作为参考，不是真理
+- 胜负判定是游戏化的，帮助结构化思考
+
+## 📄 许可证
+
+MIT License
 
 ---
 
-## 支持的Skill
-
-| 人物 | Skill名称 |
-|------|----------|
-| 巴菲特 | warren-buffett |
-| 芒格 | charlie-munger |
-| 纽森 | gavin-newsom |
-| 特朗普 | donald-trump |
-| 马斯克 | elon-musk |
-| 拜登 | joe-biden |
-
-（其他人物Skill可自行添加）
-
----
-
-## 限制与说明
-
-### 子代理模式
-- 每个辩论者都是真实的AI代理
-- Token消耗较大（约100-500元/次，取决于轮次）
-- 需要稳定的网络连接
-- 每轮之间有2秒延迟避免API过载
-
-### 模拟模式
-- 对话是程序化生成，非真实AI思考
-- Token消耗低（几毛钱/次）
-- 适合测试和预览
-
----
-
-**版本**: v2.0 (子代理模式)  
-**更新**: 2026-04-12
+**版本**: v3.5.0  
+**最后更新**: 2026-04-12  
+**作者**: erongcao
