@@ -200,7 +200,6 @@ v5.0 已成功运行10轮辩论测试：
 v5.0 需要预先蒸馏的人物Skill：
 
 ```bash
-# 人物Skill路径
 ~/.openclaw/workspace/skills/
 ├── donald-trump-perspective/     # 特朗普
 ├── benjamin-netanyahu-perspective/ # 内塔尼亚胡
@@ -209,6 +208,17 @@ v5.0 需要预先蒸馏的人物Skill：
 ├── vladimir-putin-perspective/    # 普京
 └── keir-starmer-perspective/     # 斯塔默(主持人)
 ```
+
+### 路径配置
+
+脚本使用以下环境变量（可覆盖）：
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `SKILLS_DIR` | `$HOME/.openclaw/workspace/skills` | Skill文件目录 |
+| `OUTPUT_DIR` | `/tmp/virtual-forum-output` | 输出目录 |
+
+**安全注意**：默认输出到临时目录，避免暴露本地路径结构。
 
 ### 自定义辩论
 

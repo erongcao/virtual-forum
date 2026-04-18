@@ -9,8 +9,9 @@
 
 set -o pipefail
 
-SKILLS_DIR="$HOME/.openclaw/workspace/skills"
-OUTPUT_DIR="$HOME/Obsidian/我的远程库/虚拟论坛"
+# 注意：这些路径可以通过环境变量覆盖
+SKILLS_DIR="${SKILLS_DIR:-$HOME/.openclaw/workspace/skills}"
+OUTPUT_DIR="${OUTPUT_DIR:-/tmp/virtual-forum-output}"
 TOPIC="2026年美国、以色列、伊朗三国战争走向"
 ROUNDS=10
 CLAUDE_TIMEOUT=300  # 每轮超时5分钟
