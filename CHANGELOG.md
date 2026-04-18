@@ -2,6 +2,41 @@
 
 All notable changes to the Virtual Forum skill will be documented in this file.
 
+## [3.9.0] - 2026-04-18
+
+### Added
+- **议价博弈 (BargainingGame)** [P1]
+  - Rubinstein (1982) 轮流议价均衡
+  - `calculateEquilibrium()`: 计算均衡份额
+  - `generateOffer()`: 生成出价建议
+  - `evaluateOffer()`: 评估是否接受出价
+  - `getBargainingPhase()`: 议价阶段分析
+
+- **联盟博弈 (CoalitionGame)** [P1]
+  - Shapley (1953) 联盟价值分配
+  - `calculateShapleyValues()`: Shapley值计算
+  - `calculateAllCoalitions()`: 所有联盟及价值
+  - `checkCoreStability()`: 核心稳定性检测
+  - `predictOptimalCoalition()`: 最优联盟预测
+
+### Documentation
+- Updated SKILL.md with v3.9 section
+- Added BargainingGame theory and examples
+- Added CoalitionGame theory and examples
+- Comparison table: v3.8 vs v3.9
+
+### Technical Details
+
+**Rubinstein均衡**:
+```
+p1_share = (1 - δ₂) / (1 - δ₁δ₂)
+```
+
+**Shapley公式**:
+```
+φ_i(v) = Σ_{S⊆N\{i}} [|S|!(n-|S|-1)!/n!] × [v(S∪{i}) - v(S)]
+```
+
 ## [3.8.0] - 2026-04-18
 
 ### Added

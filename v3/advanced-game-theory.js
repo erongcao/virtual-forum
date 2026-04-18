@@ -1,52 +1,36 @@
 /**
- * 虚拟论坛 - 高级博弈论模块 v3.8
- * Advanced Game Theory Module v3.8
+ * 虚拟论坛 - 高级博弈论模块 v3.9
+ * Advanced Game Theory Module v3.9
  * 
- * v3.7基础上新增三大核心模块：
- * 1. 信号博弈 (Signaling Games) - Spence 1973
- * 2. 重复博弈 (Repeated Games) - Folk Theorem
- * 3. 信息设计 (Information Design) - Kamenica & Mandler 2012
+ * v3.8基础上新增：
+ * P1: 议价博弈 (Rubinstein Bargaining) + 联盟博弈 (Shapley Value)
  * 
- * 解决虚拟论坛最核心的三个问题：
- * - 谁说的可信？ → 信号博弈
- * - 多轮后会合作还是撕破脸？ → 重复博弈
- * - 主持人应该透露什么？ → 信息设计
+ * 理论依据：
+ * - Rubinstein (1982) - 轮流议价模型
+ * - Shapley (1953) - 联盟博弈与核心
  */
 
 const SubagentArena = require('../subagent-arena.js');
 const { DEFAULTS } = require('../shared-config.js');
 
-/**
- * ============================================================
- * 第一部分：信号博弈 (Signaling Games)
- * Spence 1973 - "Job Market Signaling"
- * ============================================================
- */
+// ============================================================
+// 第一部分：v3.8 核心模块（信号博弈、重复博弈、信息设计）
+// ============================================================
 
 /**
  * 信号博弈基础类
- * 
- * 核心问题：
- * - 发言者是"真的有观点"还是"只是说说"？
- * - 什么样的信号成本能筛选出真诚参与者？
- * 
- * 均衡类型：
- * - 分离均衡 (Separating): 不同类型选择不同信号 → 高成本信号 = 强信念
- * - 混同均衡 (Pooling): 不同类型选择相同信号 → 信号无信息量
  */
 class SignalingGame {
     constructor() {
-        // 信号成本配置
         this.signalCosts = {
-            'strong_claim': 0.8,      // 强烈主张：成本高
-            'weak_claim': 0.3,        // 弱主张：成本低
-            'evidence_backed': 0.9,    // 有证据：成本高
-            'assertion': 0.2,          // 纯断言：成本低
-            'counterargument': 0.6,   // 反驳：中等成本
-            'concession': 0.5,         // 让步：中等成本
+            'strong_claim': 0.8,
+            'weak_claim': 0.3,
+            'evidence_backed': 0.9,
+            'assertion': 0.2,
+            'counterargument': 0.6,
+            'concession': 0.5,
         };
 
-        // 信号类型映射
         this.signalTypes = {
             'strong_claim': ['必须', '绝对', '显然', '毫无疑问', '必然'],
             'weak_claim': ['可能', '也许', '不确定', '大概'],
@@ -57,34 +41,16 @@ class SignalingGame {
         };
     }
 
-    /**
-     * 评估信号可信度
-     * 
-     * 计算：P(真|信号) = P(信号|真)P(真) / P(信号)
-     * 
-     * @param {string} content - 发言内容
-     * @param {string} speakerType - 发言者类型: 'expert' | 'layman' | 'strategic'
-     * @param {object} priorBelief - 先验概率 P(真)
-     * @returns {object} 包含可信度评估和信号分析
-     */
     assessSignalCredibility(content, speakerType, priorBelief = 0.5) {
         if (!content) return { credible: false, confidence: 0, reason: '空发言' };
 
-        // 识别信号类型
         const signalType = this._identifySignalType(content);
         const signalCost = this.signalCosts[signalType] || 0.5;
-
-        // 计算信号可靠性 (基于sender类型和信号成本的联合概率)
         const likelihoodRatio = this._calculateLikelihoodRatio(speakerType, signalType);
         
-        // 贝叶斯更新后验概率
         const posteriorOdds = likelihoodRatio * (priorBelief / (1 - priorBelief));
         const posterior = posteriorOdds / (1 + posteriorOdds);
-
-        // 分离均衡检验：信号成本是否足够高？
         const isSeparating = this._checkSeparatingEquilibrium(signalCost, speakerType);
-
-        // 信号信息量
         const signalInfo = this._calculateMutualInformation(signalType, speakerType);
 
         return {
@@ -101,21 +67,15 @@ class SignalingGame {
         };
     }
 
-    /**
-     * 识别信号类型
-     */
     _identifySignalType(content) {
         for (const [type, keywords] of Object.entries(this.signalTypes)) {
             if (keywords.some(kw => content.includes(kw))) {
                 return type;
             }
         }
-        return 'assertion';  // 默认弱信号
+        return 'assertion';
     }
 
-    /**
-     * 计算似然比 P(信号|type) / P(信号|非type)
-     */
     _calculateLikelihoodRatio(speakerType, signalType) {
         const probs = {
             expert: { strong_claim: 0.8, weak_claim: 0.3, evidence_backed: 0.9, assertion: 0.4, counterargument: 0.7, concession: 0.5 },
@@ -124,86 +84,46 @@ class SignalingGame {
         };
 
         const pSignalGivenType = probs[speakerType]?.[signalType] || 0.5;
-        const pSignalGivenNotType = 0.3;  // 简化：非该类型发出该信号的概率
-
+        const pSignalGivenNotType = 0.3;
         return pSignalGivenType / pSignalGivenNotType;
     }
 
-    /**
-     * 检验分离均衡条件
-     * 
-     * 分离均衡要求：
-     * 1. 不同类型选择不同信号
-     * 2. 信号成本足够高，使得伪装不经济
-     */
     _checkSeparatingEquilibrium(signalCost, speakerType) {
-        // 高成本信号对专家更可信
         if (speakerType === 'expert' && signalCost >= 0.7) return true;
-        // 低成本信号无法区分类型
         if (speakerType === 'layman' && signalCost <= 0.3) return false;
-        // 中等成本可能是混同均衡
         return signalCost > 0.5;
     }
 
-    /**
-     * 计算互信息 I(类型;信号)
-     */
     _calculateMutualInformation(signalType, speakerType) {
-        // 简化：互信息 = 信号成本 × 类型匹配度
         const typeMatchScore = { expert: 1.0, layman: 0.5, strategic: 0.7 };
         const cost = this.signalCosts[signalType] || 0.5;
         return cost * (typeMatchScore[speakerType] || 0.5);
     }
 
-    /**
-     * 生成可信度理由
-     */
     _generateCredibilityReason(signalType, signalCost, isSeparating, posterior) {
         if (isSeparating && signalCost > 0.6) {
-            return `分离均衡信号：${signalType}类型发言，成本=${signalCost.toFixed(1)}，后验=${posterior.toFixed(2)}`;
+            return `分离均衡信号：${signalType}，后验=${posterior.toFixed(2)}`;
         } else if (posterior > 0.6) {
             return `高可信信号：后验=${posterior.toFixed(2)}`;
         } else if (posterior < 0.4) {
-            return `低可信信号：后验=${posterior.toFixed(2)}，可能为混同均衡`;
+            return `低可信信号：后验=${posterior.toFixed(2)}`;
         }
         return `中等可信：需要更多信号验证`;
-    }
-
-    /**
-     * 批量评估发言可信度
-     */
-    assessMultipleSignals(utterances) {
-        return utterances.map(u => ({
-            content: u.content?.substring(0, 50),
-            assessment: this.assessSignalCredibility(u.content, u.speakerType, u.prior),
-        }));
     }
 }
 
 
 /**
- * ============================================================
- * 第二部分：重复博弈与合作动态 (Repeated Games)
- * Folk Theorem - 无限期重复博弈
- * ============================================================
- */
-
-/**
  * 合作追踪器
- * 
- * 实现冷酷策略 (Grim Trigger) 和 针锋相对 (Tit-for-Tat)
  */
 class CooperationTracker {
     constructor() {
-        this.history = [];  // [{player, action, cooperated}]
-        this.punishmentPhase = {};  // player -> inPunishment
+        this.history = [];
+        this.punishmentPhase = {};
         this.cooperationCount = {};
         this.defectionCount = {};
     }
 
-    /**
-     * 记录一轮行动
-     */
     recordAction(player, action, cooperated) {
         this.history.push({ player, action, cooperated, round: this.history.length + 1 });
         
@@ -214,9 +134,6 @@ class CooperationTracker {
         else this.defectionCount[player]++;
     }
 
-    /**
-     * 获取合作率
-     */
     getCooperationRate(player = null) {
         if (player) {
             const total = this.cooperationCount[player] + this.defectionCount[player];
@@ -229,23 +146,14 @@ class CooperationTracker {
         return total > 0 ? allCooperations / total : 0;
     }
 
-    /**
-     * 检查玩家是否处于惩罚阶段
-     */
     isInPunishment(player) {
         return this.punishmentPhase[player] || false;
     }
 
-    /**
-     * 进入惩罚阶段
-     */
     startPunishment(player) {
         this.punishmentPhase[player] = true;
     }
 
-    /**
-     * 结束惩罚阶段（需要双方合作才恢复）
-     */
     maybeEndPunishment(player, otherPlayer) {
         const myLastAction = this.history.filter(h => h.player === player).pop();
         const otherLastAction = this.history.filter(h => h.player === otherPlayer).pop();
@@ -257,9 +165,6 @@ class CooperationTracker {
         return false;
     }
 
-    /**
-     * 获取合作历史摘要
-     */
     getSummary() {
         return {
             totalRounds: this.history.length,
@@ -276,12 +181,6 @@ class CooperationTracker {
 
 /**
  * 重复博弈引擎
- * 
- * 实现：
- * - 无限期重复博弈的Folk Theorem
- * - 冷酷策略 (Grim Trigger)
- * - 针锋相对 (Tit-for-Tat)
- * - 战略评估
  */
 class RepeatedGameEngine {
     constructor(discountFactor = 0.9) {
@@ -295,14 +194,6 @@ class RepeatedGameEngine {
         };
     }
 
-    /**
-     * 获取玩家的战略建议
-     * 
-     * @param {string} player - 玩家名
-     * @param {string} opponent - 对手名
-     * @param {string} strategyType - 战略类型
-     * @returns {object} 建议的行动和理由
-     */
     getStrategicAdvice(player, opponent, strategyType = 'tft') {
         const history = this._getPlayerHistory(player, opponent);
         const opponentLastAction = this._getOpponentLastAction(opponent);
@@ -332,7 +223,6 @@ class RepeatedGameEngine {
                 reason = '默认合作';
         }
 
-        // 检查是否应该进入惩罚阶段
         if (this.cooperationTracker.isInPunishment(player)) {
             recommendedAction = 'defect';
             reason += ' | 处于惩罚阶段';
@@ -348,7 +238,6 @@ class RepeatedGameEngine {
     }
 
     _grimTriggerDecision(history, opponentLastAction) {
-        // 如果对手曾经背叛过，就永远背叛
         const hasDefected = history.some(h => !h.cooperated);
         return hasDefected ? 'defect' : 'cooperate';
     }
@@ -360,99 +249,49 @@ class RepeatedGameEngine {
 
     _generousTFTDecision(opponentLastAction) {
         if (opponentLastAction === null) return 'cooperate';
-        // 10%概率原谅
         return opponentLastAction ? 'cooperate' : (Math.random() < 0.1 ? 'cooperate' : 'defect');
     }
 
     _suspiciousTFTDecision(opponentLastAction, history) {
-        // 需要连续两次合作才原谅
         const recentCooperations = history.slice(-2).filter(h => h.cooperated).length;
         return recentCooperations >= 2 ? 'cooperate' : 'defect';
     }
 
     _getPlayerHistory(player, opponent) {
-        return this.cooperationTracker.history.filter(
-            h => h.player === player
-        );
+        return this.cooperationTracker.history.filter(h => h.player === player);
     }
 
     _getOpponentLastAction(opponent) {
-        const last = this.cooperationTracker.history
-            .filter(h => h.player === opponent)
-            .pop();
+        const last = this.cooperationTracker.history.filter(h => h.player === opponent).pop();
         return last ? last.cooperated : null;
     }
 
-    /**
-     * 计算合作的长期价值 vs 短期背叛
-     * 
-     * Folk Theorem核心：
-     * - 如果贴现因子δ足够高，未来合作价值 > 短期背叛收益
-     * - 均衡条件：背叛收益 < 长期合作价值
-     */
     calculateTemptationThreshold() {
-        // 背叛诱惑T vs 合作奖励R vs 欺骗惩罚P vs 双输S
-        // 合作条件：T - δR / (1-δ) < R
-        // 简化：T < R / (1-δ)
         return 1 / (1 - this.discountFactor);
     }
 
-    /**
-     * 判断当前是否处于"合作区"
-     */
     isInCooperationZone() {
-        const rate = this.cooperationTracker.getCooperationRate();
-        return rate > 0.6;
+        return this.cooperationTracker.getCooperationRate() > 0.6;
     }
 
-    /**
-     * 判断是否进入"战争区"
-     */
     isInConflictZone() {
-        const rate = this.cooperationTracker.getCooperationRate();
-        return rate < 0.3;
+        return this.cooperationTracker.getCooperationRate() < 0.3;
     }
 
-    /**
-     * 获取博弈阶段分析
-     */
     getPhaseAnalysis() {
         const rate = this.cooperationTracker.getCooperationRate();
         
         if (rate > 0.7) {
-            return {
-                phase: 'COOPERATION',
-                description: '已进入合作阶段，各方倾向于维护现状',
-                stability: '高',
-                risk: '低',
-            };
+            return { phase: 'COOPERATION', description: '已进入合作阶段', stability: '高', risk: '低' };
         } else if (rate > 0.4) {
-            return {
-                phase: 'TRANSITION',
-                description: '处于过渡阶段，结果未定',
-                stability: '中',
-                risk: '中',
-            };
+            return { phase: 'TRANSITION', description: '处于过渡阶段', stability: '中', risk: '中' };
         } else if (rate > 0.0) {
-            return {
-                phase: 'CONFLICT',
-                description: '处于冲突阶段，可能互相惩罚',
-                stability: '低',
-                risk: '高',
-            };
+            return { phase: 'CONFLICT', description: '处于冲突阶段', stability: '低', risk: '高' };
         }
         
-        return {
-            phase: 'UNKNOWN',
-            description: '暂无足够历史数据',
-            stability: '未知',
-            risk: '未知',
-        };
+        return { phase: 'UNKNOWN', description: '暂无足够历史数据', stability: '未知', risk: '未知' };
     }
 
-    /**
-     * 记录行动并更新状态
-     */
     recordRound(player, action, cooperated) {
         this.cooperationTracker.recordAction(player, action, cooperated);
     }
@@ -460,48 +299,23 @@ class RepeatedGameEngine {
 
 
 /**
- * ============================================================
- * 第三部分：信息设计 (Information Design)
- * Kamenica & Mandler 2012 - Bayesian Persuasion
- * ============================================================
- */
-
-/**
  * 信息设计器
- * 
- * 核心问题：
- * - 主持人应该透露多少信息？
- * - 以什么方式透露？
- * - 如何影响参与者的信念和策略？
  */
 class InformationDesigner {
     constructor() {
         this.disclosureModes = {
-            FULL: 'full',           // 完全披露
-            STRATEGIC: 'strategic', // 策略性披露
-            CONDITIONAL: 'conditional', // 条件披露
+            FULL: 'full',
+            STRATEGIC: 'strategic',
+            CONDITIONAL: 'conditional',
         };
     }
 
-    /**
-     * 建议最优信息披露策略
-     * 
-     * @param {string} topic - 讨论主题
-     * @param {array} participantStates - 参与者状态
-     * @param {object} currentBeliefs - 当前信念分布
-     * @returns {object} 建议的信息披露策略
-     */
     suggestDisclosure(topic, participantStates, currentBeliefs = {}) {
-        // 分析参与者状态
         const overconfident = participantStates.filter(s => s.confidence > 0.8);
         const uncertain = participantStates.filter(s => s.confidence < 0.4);
-        const balanced = participantStates.filter(s => s.confidence >= 0.4 && s.confidence <= 0.8);
 
-        // 诊断问题类型
         const diagnosis = this._diagnoseInformationProblem(participantStates, currentBeliefs);
-
-        // 生成建议
-        const recommendation = this._generateRecommendation(diagnosis, overconfident, uncertain, balanced);
+        const recommendation = this._generateRecommendation(diagnosis, overconfident, uncertain);
 
         return {
             mode: recommendation.mode,
@@ -515,19 +329,16 @@ class InformationDesigner {
     _diagnoseInformationProblem(participantStates, currentBeliefs) {
         const problems = [];
 
-        // 检查过度自信
         const overconfident = participantStates.filter(s => s.confidence > 0.8);
         if (overconfident.length > participantStates.length / 2) {
             problems.push('OVERCONFIDENT_DOMINANT');
         }
 
-        // 检查不一致信念
         const beliefVariance = this._calculateBeliefVariance(currentBeliefs);
         if (beliefVariance > 0.3) {
             problems.push('BELIEF_DIVERGENCE');
         }
 
-        // 检查信息不对称
         const infoHaves = participantStates.filter(s => s.hasEvidence);
         const infoHaveNots = participantStates.filter(s => !s.hasEvidence);
         if (infoHaves.length > 0 && infoHaveNots.length > 0) {
@@ -546,13 +357,13 @@ class InformationDesigner {
         return variance;
     }
 
-    _generateRecommendation(diagnosis, overconfident, uncertain, balanced) {
+    _generateRecommendation(diagnosis, overconfident, uncertain) {
         if (diagnosis.includes('OVERCONFIDENT_DOMINANT')) {
             return {
                 mode: this.disclosureModes.STRATEGIC,
                 content: '提供反事实证据和反对观点',
                 expectedImpact: '降低过度自信，促进实质性讨论',
-                rationale: '当多数人过度自信时，策略性披露反对方观点可以平衡讨论',
+                rationale: '多数人过度自信时，策略性披露反对方观点可以平衡讨论',
             };
         }
 
@@ -570,7 +381,7 @@ class InformationDesigner {
                 mode: this.disclosureModes.CONDITIONAL,
                 content: '要求信息优势方披露来源，允许追问',
                 expectedImpact: '减少信息不对称，提高论据质量',
-                rationale: '信息不对称会破坏讨论公平性，需要结构性调整',
+                rationale: '信息不对称会破坏讨论公平性',
             };
         }
 
@@ -582,15 +393,7 @@ class InformationDesigner {
         };
     }
 
-    /**
-     * 计算最优信号设计
-     * 
-     * 给定要实现的行动，选择最优的信息结构
-     */
     optimalSignalDesign(targetAction, priorBelief, payoffFunction) {
-        // 简化的信号设计计算
-        // 目标：选择信息结构最大化期望效用
-        
         const possibleSignals = ['strong_positive', 'weak_positive', 'neutral', 'weak_negative', 'strong_negative'];
         let bestSignal = 'neutral';
         let bestUtility = -Infinity;
@@ -613,13 +416,9 @@ class InformationDesigner {
     }
 
     _updateBeliefGivenSignal(prior, signal) {
-        // 简化的贝叶斯更新
         const signalStrengths = {
-            'strong_positive': 0.8,
-            'weak_positive': 0.6,
-            'neutral': 0.5,
-            'weak_negative': 0.4,
-            'strong_negative': 0.2,
+            'strong_positive': 0.8, 'weak_positive': 0.6, 'neutral': 0.5,
+            'weak_negative': 0.4, 'strong_negative': 0.2,
         };
         
         const strength = signalStrengths[signal] || 0.5;
@@ -628,29 +427,663 @@ class InformationDesigner {
 }
 
 
+// ============================================================
+// 第二部分：P1 新增 - 议价博弈 (Bargaining Games)
+// Rubinstein (1982) - 轮流议价模型
+// ============================================================
+
 /**
- * ============================================================
- * 第四部分：整合博弈论竞技场 (Advanced Game Theory Arena)
- * ============================================================
+ * 议价博弈引擎
+ * 
+ * 核心问题：
+ * - 蛋糕如何分配？
+ * - 谁先出价？
+ * - 耐心程度（折扣因子）如何影响结果？
+ * 
+ * Rubinstein均衡：
+ * - 每人获得 = (1 - δ₂) / (1 - δ₁δ₂) 当1先出价
+ * - 每人获得 = δ₁(1 - δ₂) / (1 - δ₁δ₂) 当2先出价
  */
+class BargainingGame {
+    constructor() {
+        this.rounds = [];
+        this.currentRound = 0;
+        this.currentOffer = null;
+        this.offerHistory = [];
+    }
+
+    /**
+     * 计算Rubinstein均衡份额
+     * 
+     * @param {number} delta1 - 玩家1的折扣因子 (0 < δ ≤ 1)
+     * @param {number} delta2 - 玩家2的折扣因子 (0 < δ ≤ 1)
+     * @param {string} firstMover - 谁先出价: 'player1' | 'player2'
+     * @returns {object} 均衡份额
+     */
+    calculateEquilibrium(delta1, delta2, firstMover = 'player1') {
+        // 均衡条件：δ₂/(1-δ₁δ₂) vs δ₁/(1-δ₁δ₂)
+        // 总蛋糕 = 1
+        
+        const denominator = 1 - delta1 * delta2;
+        
+        let p1Share, p2Share;
+        
+        if (firstMover === 'player1') {
+            // 玩家1先出价，获得更多
+            p1Share = (1 - delta2) / denominator;
+            p2Share = delta2 * (1 - delta1) / denominator;
+        } else {
+            // 玩家2先出价，获得更多
+            p1Share = delta1 * (1 - delta2) / denominator;
+            p2Share = (1 - delta1) / denominator;
+        }
+
+        // 计算先手优势
+        const firstMoverAdvantage = Math.abs(p1Share - p2Share);
+
+        return {
+            player1: { share: p1Share, sharePercent: (p1Share * 100).toFixed(1) + '%' },
+            player2: { share: p2Share, sharePercent: (p2Share * 100).toFixed(1) + '%' },
+            firstMover,
+            firstMoverAdvantage: firstMoverAdvantage.toFixed(3),
+            total: p1Share + p2Share,
+            equilibrium: 'Rubinstein',
+        };
+    }
+
+    /**
+     * 计算均衡（给定贴现因子）
+     */
+    calculateEquilibriumShares(delta1, delta2) {
+        // Rubinstein均衡公式
+        const denominator = 1 - delta1 * delta2;
+        
+        // 玩家1的份额（当玩家1先出价时）
+        const p1First = (1 - delta2) / denominator;
+        
+        // 玩家2的份额（当玩家2先出价时）
+        const p2First = (1 - delta1) / denominator;
+        
+        return {
+            p1IfFirst: { share: p1First, percent: (p1First * 100).toFixed(1) + '%' },
+            p2IfFirst: { share: p2First, percent: (p2First * 100).toFixed(1) + '%' },
+        };
+    }
+
+    /**
+     * 生成出价建议
+     * 
+     * @param {string} player - 出价者
+     * @param {number} myDelta - 出价者的折扣因子
+     * @param {number} opponentDelta - 对手的折扣因子
+     * @param {number} currentValue - 当前议题总价值
+     * @param {number} roundNumber - 当前轮次
+     */
+    generateOffer(player, myDelta, opponentDelta, currentValue = 100, roundNumber = 1) {
+        // 计算理论均衡份额
+        const equilibrium = this.calculateEquilibrium(myDelta, opponentDelta);
+        
+        // 当前轮次的贴现值
+        const discountedValue = currentValue * Math.pow(myDelta, roundNumber - 1);
+        
+        // 考虑对手的保留价值
+        const myMinAccept = currentValue * 0.1;  // 最低接受阈值
+        const oppMinAccept = currentValue * 0.1;
+        
+        // 生成出价
+        // 理想出价：接近对手的均衡份额，但稍微让步以促进达成
+        const idealOffer = equilibrium.player2.share * 0.9;  // 给对手留点余地
+        
+        const offer = {
+            player,
+            round: roundNumber,
+            rawValue: currentValue,
+            discountedValue: discountedValue.toFixed(2),
+            suggestedShare: idealOffer.toFixed(3),
+            suggestedAmount: (idealOffer * discountedValue).toFixed(2),
+            minAcceptable: myMinAccept,
+            equilibriumAnalysis: {
+                ifIFirst: equilibrium.player1.sharePercent,
+                ifOppFirst: equilibrium.player2.sharePercent,
+            },
+            strategy: this._getOfferStrategy(roundNumber, myDelta, opponentDelta),
+        };
+
+        this.currentOffer = offer;
+        this.offerHistory.push(offer);
+        return offer;
+    }
+
+    /**
+     * 获取出价策略描述
+     */
+    _getOfferStrategy(round, myDelta, oppDelta) {
+        const deltaRatio = myDelta / oppDelta;
+        
+        if (round === 1 && deltaRatio > 1) {
+            return '激进先手：利用耐心优势争取更大份额';
+        } else if (round === 1 && deltaRatio < 1) {
+            return '保守先手：接受较少的均衡份额，快速达成';
+        } else if (deltaRatio > 1.2) {
+            return '耐心优势：可以等更久，拖时间有利';
+        } else if (deltaRatio < 0.8) {
+            return '耐心劣势：尽快达成，否则损失增加';
+        }
+        return '对等博弈：份额取决于谁先出价';
+    }
+
+    /**
+     * 评估是否接受当前出价
+     * 
+     * @param {string} player - 被评估的玩家
+     * @param {number} offeredShare - 收到的份额 (0-1)
+     * @param {number} myDelta - 我的折扣因子
+     * @param {number} opponentDelta - 对手的折扣因子
+     * @param {number} roundNumber - 当前轮次
+     */
+    evaluateOffer(player, offeredShare, myDelta, opponentDelta, roundNumber) {
+        // 计算当前轮次接受的价值
+        const currentValueIfAccept = offeredShare;
+        
+        // 计算下一轮拒绝的价值（贴现后）
+        const futureValueIfReject = (1 - offeredShare) * myDelta;  // 下一轮我能获得的
+        
+        // 是否接受？
+        const shouldAccept = currentValueIfAccept >= futureValueIfReject;
+        
+        // 接受率
+        const acceptProbability = this._calculateAcceptanceProbability(
+            currentValueIfAccept, futureValueIfReject
+        );
+
+        return {
+            player,
+            offeredShare,
+            currentValueIfAccept: currentValueIfAccept.toFixed(3),
+            futureValueIfReject: futureValueIfReject.toFixed(3),
+            shouldAccept,
+            acceptProbability: (acceptProbability * 100).toFixed(0) + '%',
+            rationale: shouldAccept 
+                ? `接受：当前${(currentValueIfAccept*100).toFixed(1)}% > 未来${(futureValueIfReject*100).toFixed(1)}%`
+                : `拒绝：当前${(currentValueIfAccept*100).toFixed(1)}% < 未来${(futureValueIfReject*100).toFixed(1)}%，等待更多`,
+            breakdown: {
+                currentRound: roundNumber,
+                myDiscount: myDelta,
+                oppDiscount: opponentDelta,
+                timeToNextRound: '1 period',
+            },
+        };
+    }
+
+    /**
+     * 计算接受概率（基于期望效用）
+     */
+    _calculateAcceptanceProbability(valueIfAccept, valueIfReject) {
+        // 使用确定性等价
+        // 风险中性：直接比较
+        if (valueIfAccept >= valueIfReject) {
+            return 0.9;  // 高概率接受
+        } else {
+            return 0.3;  // 低概率接受
+        }
+    }
+
+    /**
+     * 获取议价阶段分析
+     */
+    getBargainingPhase() {
+        if (this.offerHistory.length === 0) {
+            return { phase: 'INITIAL', description: '尚未开始', urgency: '低' };
+        }
+        
+        const lastOffer = this.offerHistory[this.offerHistory.length - 1];
+        const round = lastOffer.round;
+        
+        if (round <= 2) {
+            return { phase: 'EARLY', description: '早期议价，份额弹性大', urgency: '中' };
+        } else if (round <= 5) {
+            return { phase: 'MIDDLE', description: '中期博弈，关注耐心程度', urgency: '中高' };
+        } else {
+            return { phase: 'LATE', description: '后期接近deadline，达成压力增大', urgency: '高' };
+        }
+    }
+
+    /**
+     * 生成议价报告
+     */
+    generateBargainingReport(delta1, delta2) {
+        const equilibrium = this.calculateEquilibrium(delta1, delta2);
+        const phase = this.getBargainingPhase();
+        const shares = this.calculateEquilibriumShares(delta1, delta2);
+
+        let report = '🤝 议价博弈分析\n';
+        report += '═══════════════════════════════════\n';
+        report += `均衡类型: ${equilibrium.equilibrium}\n`;
+        report += `先手方: ${equilibrium.firstMover}\n`;
+        report += `先手优势: ${equilibrium.firstMoverAdvantage}\n\n`;
+
+        report += 'Rubinstein均衡份额:\n';
+        report += `  P1先出价: P1=${equilibrium.player1.sharePercent}, P2=${equilibrium.player2.sharePercent}\n`;
+        report += `  P2先出价: P1=${(1 - equilibrium.player2.share).toFixed(1)}%, P2=${equilibrium.player2.sharePercent}\n\n`;
+
+        report += '当前阶段:\n';
+        report += `  ${phase.phase}: ${phase.description}\n`;
+        report += `  紧迫度: ${phase.urgency}\n\n`;
+
+        report += '出价历史:\n';
+        for (const offer of this.offerHistory) {
+            report += `  R${offer.round}: ${offer.player} 出价 ${offer.suggestedAmount}\n`;
+        }
+
+        return report;
+    }
+}
+
+
+// ============================================================
+// 第三部分：P1 新增 - 联盟博弈 (Coalitional Games)
+// Shapley (1953) - 联盟博弈与核心
+// ============================================================
+
+/**
+ * 联盟博弈引擎
+ * 
+ * 核心问题：
+ * - 在多人讨论中，谁和谁结盟？
+ * - 联盟收益如何分配才公平？
+ * - 联盟是否会崩溃？
+ * 
+ * 解决方案：Shapley值
+ * - 每个玩家的贡献 = 所有联盟中该玩家的边际贡献的平均值
+ */
+class CoalitionGame {
+    constructor() {
+        this.players = [];
+        this.coalitionHistory = [];
+        this.valueFunction = null;
+    }
+
+    /**
+     * 初始化联盟博弈
+     * 
+     * @param {array} players - 玩家列表
+     * @param {function} valueFunction - 联盟价值函数 v(S) → number
+     * 
+     * 示例：
+     * valueFunction = (S) => {
+     *   if (S.length === 0) return 0;
+     *   if (S.length === 1) return 1;
+     *   if (S.length === 2) return 3;
+     *   if (S.length === 3) return 5;
+     *   return 5;
+     * }
+     */
+    init(players, valueFunction) {
+        this.players = players;
+        this.valueFunction = valueFunction;
+    }
+
+    /**
+     * 计算Shapley值
+     * 
+     * φ_i(v) = Σ_{S ⊆ N\\{i}} [|S|! (n-|S|-1)! / n!] × [v(S ∪ {i}) - v(S)]
+     * 
+     * @returns {object} 每个玩家的Shapley值
+     */
+    calculateShapleyValues() {
+        const n = this.players.length;
+        const shapleyValues = {};
+
+        for (const player of this.players) {
+            let totalContribution = 0;
+            
+            // 遍历所有不包含该玩家的联盟S
+            const otherPlayers = this.players.filter(p => p !== player);
+            const allSubsets = this._generateSubsets(otherPlayers);
+            
+            for (const S of allSubsets) {
+                const sSize = S.length;
+                
+                // 边际贡献：[v(S ∪ {i}) - v(S)]
+                const valueWith = this.valueFunction([...S, player]);
+                const valueWithout = this.valueFunction(S);
+                const marginalContribution = valueWith - valueWithout;
+                
+                // 加权系数：|S|! (n-|S|-1)! / n!
+                const weight = this._calculateWeight(sSize, n);
+                
+                totalContribution += weight * marginalContribution;
+            }
+            
+            shapleyValues[player] = totalContribution;
+        }
+
+        return {
+            shapleyValues,
+            totalValue: Object.values(shapleyValues).reduce((a, b) => a + b, 0),
+            distribution: this._normalizeDistribution(shapleyValues),
+        };
+    }
+
+    /**
+     * 生成所有子集
+     */
+    _generateSubsets(players) {
+        const subsets = [];
+        const n = players.length;
+        
+        // 使用二进制表示生成所有子集
+        for (let mask = 0; mask < (1 << n); mask++) {
+            const subset = [];
+            for (let i = 0; i < n; i++) {
+                if (mask & (1 << i)) {
+                    subset.push(players[i]);
+                }
+            }
+            subsets.push(subset);
+        }
+        
+        return subsets;
+    }
+
+    /**
+     * 计算Shapley权重
+     */
+    _calculateWeight(sSize, n) {
+        // |S|! (n-|S|-1)! / n!
+        const sFactorial = this._factorial(sSize);
+        const remainingFactorial = this._factorial(n - sSize - 1);
+        const nFactorial = this._factorial(n);
+        
+        return (sFactorial * remainingFactorial) / nFactorial;
+    }
+
+    /**
+     * 阶乘
+     */
+    _factorial(n) {
+        if (n <= 1) return 1;
+        let result = 1;
+        for (let i = 2; i <= n; i++) {
+            result *= i;
+        }
+        return result;
+    }
+
+    /**
+     * 标准化分配（确保总和=1）
+     */
+    _normalizeDistribution(shapleyValues) {
+        const total = Object.values(shapleyValues).reduce((a, b) => a + b, 0);
+        const distribution = {};
+        
+        for (const [player, value] of Object.entries(shapleyValues)) {
+            distribution[player] = {
+                value,
+                percent: total !== 0 ? ((value / total) * 100).toFixed(1) + '%' : '0%',
+            };
+        }
+        
+        return distribution;
+    }
+
+    /**
+     * 计算所有可能的联盟及其价值
+     */
+    calculateAllCoalitions() {
+        const allCoalitions = [];
+        const subsets = this._generateSubsets(this.players);
+        
+        for (const subset of subsets) {
+            if (subset.length === 0) continue;
+            
+            const value = this.valueFunction(subset);
+            const players = subset.join(' + ');
+            
+            allCoalitions.push({
+                coalition: players,
+                size: subset.length,
+                value,
+                valuePerPlayer: (value / subset.length).toFixed(2),
+            });
+        }
+        
+        // 按价值排序
+        return allCoalitions.sort((a, b) => b.value - a.value);
+    }
+
+    /**
+     * 检测稳定联盟（核心检测）
+     * 
+     * 核心(Core)条件：
+     * 对于每个联盟S：Σ_{i∈S} φ_i ≥ v(S)
+     * 即：分配给每个联盟的价值不小于该联盟单独能获得的价值
+     */
+    checkCoreStability(shapleyValues) {
+        const coalitions = this.calculateAllCoalitions();
+        const violations = [];
+        
+        for (const coalition of coalitions) {
+            if (coalition.size < 2) continue;  // 单人联盟总是稳定的
+            
+            // 计算该联盟中玩家获得的Shapley值总和
+            const coalitionPlayers = coalition.coalition.split(' + ');
+            const allocatedValue = coalitionPlayers.reduce(
+                (sum, p) => sum + (shapleyValues[p] || 0), 0
+            );
+            
+            // 检验：分配值 ≥ 联盟单独价值
+            if (allocatedValue < coalition.value) {
+                violations.push({
+                    coalition: coalition.coalition,
+                    allocated: allocatedValue.toFixed(3),
+                    standalone: coalition.value.toFixed(3),
+                    deficit: (coalition.value - allocatedValue).toFixed(3),
+                });
+            }
+        }
+        
+        return {
+            isStable: violations.length === 0,
+            violations,
+            stabilityScore: violations.length === 0 ? 100 : Math.max(0, 100 - violations.length * 20),
+        };
+    }
+
+    /**
+     * 预测最优联盟结构
+     * 
+     * 使用贪婪算法找最大价值联盟
+     */
+    predictOptimalCoalition() {
+        const allCoalitions = this.calculateAllCoalitions();
+        
+        // 找最大价值联盟
+        const maxValueCoalition = allCoalitions[0];
+        
+        // 计算联盟内各玩家的Shapley值占比
+        const coalitionPlayers = maxValueCoalition.coalition.split(' + ');
+        const coalitionShapley = {};
+        let totalShapleyInCoalition = 0;
+        
+        for (const player of coalitionPlayers) {
+            coalitionShapley[player] = this._calculateIndividualShapley(player);
+            totalShapleyInCoalition += coalitionShapley[player];
+        }
+
+        // 检查是否有人想跳槽
+        const incentivesToDefect = this._checkIncentivesToDefect(
+            coalitionPlayers, coalitionShapley, totalShapleyInCoalition
+        );
+
+        return {
+            optimalCoalition: maxValueCoalition.coalition,
+            totalValue: maxValueCoalition.value,
+            valuePerPlayer: maxValueCoalition.valuePerPlayer,
+            shapleyDistribution: coalitionShapley,
+            incentivesToDefect,
+            recommendation: this._generateCoalitionRecommendation(
+                maxValueCoalition, incentivesToDefect
+            ),
+        };
+    }
+
+    /**
+     * 计算单个玩家的Shapley值
+     */
+    _calculateIndividualShapley(player) {
+        const otherPlayers = this.players.filter(p => p !== player);
+        const allSubsets = this._generateSubsets(otherPlayers);
+        
+        let total = 0;
+        const n = this.players.length;
+        
+        for (const S of allSubsets) {
+            const sSize = S.length;
+            const marginal = this.valueFunction([...S, player]) - this.valueFunction(S);
+            const weight = this._calculateWeight(sSize, n);
+            total += weight * marginal;
+        }
+        
+        return total;
+    }
+
+    /**
+     * 检查跳槽动机
+     */
+    _checkIncentivesToDefect(coalitionPlayers, shapleyDistribution, totalCoalitionShapley) {
+        const incentives = [];
+        
+        for (const player of coalitionPlayers) {
+            // 如果离开，联盟剩余玩家的价值
+            const remainingPlayers = coalitionPlayers.filter(p => p !== player);
+            const remainingValue = remainingPlayers.length > 0 
+                ? this.valueFunction(remainingPlayers) 
+                : 0;
+            
+            // 留在联盟中获得的Shapley值
+            const currentShare = shapleyDistribution[player];
+            
+            // 单飞的价值
+            const soloValue = this.valueFunction([player]);
+            
+            if (soloValue > currentShare) {
+                incentives.push({
+                    player,
+                    currentShare: currentShare.toFixed(3),
+                    soloValue: soloValue.toFixed(3),
+                    gainIfLeave: (soloValue - currentShare).toFixed(3),
+                    incentive: 'HIGH',
+                });
+            } else if (remainingValue > currentShare * (remainingPlayers.length + 1)) {
+                incentives.push({
+                    player,
+                    currentShare: currentShare.toFixed(3),
+                    remainingValue: remainingValue.toFixed(3),
+                    incentive: 'MEDIUM',
+                });
+            } else {
+                incentives.push({
+                    player,
+                    currentShare: currentShare.toFixed(3),
+                    soloValue: soloValue.toFixed(3),
+                    incentive: 'LOW',
+                });
+            }
+        }
+        
+        return incentives;
+    }
+
+    /**
+     * 生成联盟建议
+     */
+    _generateCoalitionRecommendation(coalition, incentivesToDefect) {
+        const highIncentive = incentivesToDefect.filter(i => i.incentive === 'HIGH');
+        
+        if (highIncentive.length === 0) {
+            return '联盟稳定：所有成员无强烈跳槽动机';
+        } else if (highIncentive.length === 1) {
+            return `潜在不稳定：${highIncentive[0].player} 可能有跳槽动机`;
+        } else {
+            return `联盟高度不稳定：${highIncentive.map(i => i.player).join(', ')} 都有跳槽动机`;
+        }
+    }
+
+    /**
+     * 记录联盟形成
+     */
+    recordCoalition(players, formed = true) {
+        this.coalitionHistory.push({
+            players,
+            formed,
+            round: this.coalitionHistory.length + 1,
+            timestamp: Date.now(),
+        });
+    }
+
+    /**
+     * 生成联盟博弈报告
+     */
+    generateCoalitionReport() {
+        const shapley = this.calculateShapleyValues();
+        const allCoalitions = this.calculateAllCoalitions();
+        const stability = this.checkCoreStability(shapley.shapleyValues);
+        const prediction = this.predictOptimalCoalition();
+
+        let report = '� coalition博弈分析\n';
+        report += '═══════════════════════════════════\n\n';
+
+        report += 'Shapley值分配:\n';
+        for (const [player, data] of Object.entries(shapley.distribution)) {
+            report += `  ${player}: ${data.percent} (价值=${data.value.toFixed(3)})\n`;
+        }
+        report += `  总计: ${shapley.totalValue.toFixed(3)}\n\n`;
+
+        report += '联盟稳定性 (Core检测):\n';
+        report += `  稳定: ${stability.isStable ? '是 ✅' : '否 ❌'}\n`;
+        report += `  稳定评分: ${stability.stabilityScore}/100\n`;
+        if (stability.violations.length > 0) {
+            report += '  违反项:\n';
+            for (const v of stability.violations) {
+                report += `    ${v.coalition}: 分配${v.allocated} < 独立价值${v.standalone}\n`;
+            }
+        }
+        report += '\n';
+
+        report += '最优联盟预测:\n';
+        report += `  联盟: ${prediction.optimalCoalition}\n`;
+        report += `  价值: ${prediction.totalValue}\n`;
+        report += `  建议: ${prediction.recommendation}\n\n`;
+
+        report += '联盟历史:\n';
+        for (const c of this.coalitionHistory) {
+            report += `  R${c.round}: ${c.players.join(' + ')} (${c.formed ? '形成' : '解散'})\n`;
+        }
+
+        return report;
+    }
+}
+
+
+// ============================================================
+// 第四部分：整合竞技场
+// ============================================================
 
 class AdvancedGameTheoryArena extends SubagentArena {
     constructor(skillsDir = null) {
         super(skillsDir);
         
-        // 初始化各模块
         this.signalingGame = new SignalingGame();
         this.repeatedGame = new RepeatedGameEngine();
         this.informationDesigner = new InformationDesigner();
+        this.bargainingGame = new BargainingGame();
+        this.coalitionGame = new CoalitionGame();
         
-        // 状态
         this.gameState = null;
-        this.argumentPool = [];  // 论据池
+        this.argumentPool = [];
     }
 
-    /**
-     * 初始化高级博弈论竞技场
-     */
     async initArenaWithAdvancedGameTheory(config) {
         await super.initArena(config);
 
@@ -659,6 +1092,7 @@ class AdvancedGameTheoryArena extends SubagentArena {
             participants,
             discountFactors = {},
             signals = {},
+            coalitionValues = null,
         } = config;
 
         this.gameState = {
@@ -675,17 +1109,20 @@ class AdvancedGameTheoryArena extends SubagentArena {
             })),
         };
 
+        // 初始化联盟博弈
+        if (coalitionValues && typeof coalitionValues === 'function') {
+            const playerNames = participants.map(p => p.name);
+            this.coalitionGame.init(playerNames, coalitionValues);
+        }
+
         console.log('🎲 高级博弈论参数已初始化:');
         console.log(`  主题: ${topic}`);
         console.log(`  参与者: ${participants.map(p => p.name).join(', ')}`);
-        console.log(`  模块: 信号博弈 | 重复博弈 | 信息设计`);
+        console.log(`  模块: 信号博弈 | 重复博弈 | 信息设计 | 议价博弈 | 联盟博弈`);
 
         return this.arena;
     }
 
-    /**
-     * 评估发言可信度（信号博弈）
-     */
     assessArgumentCredibility(speakerName, content) {
         const participant = this.gameState.participants.find(p => p.name === speakerName);
         if (!participant) return null;
@@ -697,7 +1134,6 @@ class AdvancedGameTheoryArena extends SubagentArena {
             prior
         );
 
-        // 更新信念
         participant.beliefs[speakerName] = assessment.posterior;
         participant.confidence = assessment.confidence;
         participant.hasEvidence = assessment.signalType.includes('evidence');
@@ -705,16 +1141,10 @@ class AdvancedGameTheoryArena extends SubagentArena {
         return assessment;
     }
 
-    /**
-     * 获取策略建议（重复博弈）
-     */
     getStrategicAdvice(playerName, opponentName) {
         return this.repeatedGame.getStrategicAdvice(playerName, opponentName);
     }
 
-    /**
-     * 建议信息披露策略（信息设计）
-     */
     suggestInformationDisclosure() {
         const states = this.gameState.participants.map(p => ({
             name: p.name,
@@ -735,19 +1165,71 @@ class AdvancedGameTheoryArena extends SubagentArena {
     }
 
     /**
-     * 记录一轮讨论
+     * 议价博弈分析
      */
+    analyzeBargaining(player1Delta, player2Delta, firstMover = 'player1') {
+        return this.bargainingGame.calculateEquilibrium(player1Delta, player2Delta, firstMover);
+    }
+
+    /**
+     * 生成出价建议
+     */
+    generateOffer建议(player, myDelta, opponentDelta, currentValue = 100) {
+        return this.bargainingGame.generateOffer(
+            player,
+            myDelta,
+            opponentDelta,
+            currentValue,
+            this.gameState?.round || 1
+        );
+    }
+
+    /**
+     * 评估是否接受出价
+     */
+    evaluateBargainingOffer(player, offeredShare, myDelta, opponentDelta) {
+        return this.bargainingGame.evaluateOffer(
+            player, offeredShare, myDelta, opponentDelta,
+            this.gameState?.round || 1
+        );
+    }
+
+    /**
+     * 联盟博弈分析
+     */
+    analyzeCoalition() {
+        if (!this.coalitionGame.valueFunction) {
+            return { error: '联盟价值函数未设置' };
+        }
+        return {
+            shapley: this.coalitionGame.calculateShapleyValues(),
+            stability: this.coalitionGame.checkCoreStability(
+                this.coalitionGame.calculateShapleyValues().shapleyValues
+            ),
+            optimal: this.coalitionGame.predictOptimalCoalition(),
+        };
+    }
+
+    /**
+     * 设置联盟价值函数
+     */
+    setCoalitionValueFunction(valueFunction) {
+        if (this.coalitionGame.players.length === 0) {
+            const playerNames = this.gameState?.participants.map(p => p.name) || [];
+            this.coalitionGame.init(playerNames, valueFunction);
+        } else {
+            this.coalitionGame.valueFunction = valueFunction;
+        }
+    }
+
     recordRound(roundData) {
         this.gameState.round++;
         const { speaker, content, action, cooperated } = roundData;
 
-        // 记录合作历史
         this.repeatedGame.recordRound(speaker, action, cooperated);
 
-        // 评估可信度
         const credibility = this.assessArgumentCredibility(speaker, content);
 
-        // 更新论据池
         this.argumentPool.push({
             round: this.gameState.round,
             speaker,
@@ -758,13 +1240,10 @@ class AdvancedGameTheoryArena extends SubagentArena {
         });
     }
 
-    /**
-     * 生成综合博弈论报告
-     */
     generateAdvancedGameTheoryReport() {
         if (!this.gameState) return '高级博弈论状态未初始化';
 
-        let report = '🎲 高级博弈论分析报告\n';
+        let report = '🎲 高级博弈论分析报告 v3.9\n';
         report += '═══════════════════════════════════════════\n\n';
 
         // 1. 信号博弈分析
@@ -776,7 +1255,6 @@ class AdvancedGameTheoryArena extends SubagentArena {
         report += `  总发言数: ${this.argumentPool.length}\n`;
         report += `  高可信信号: ${credibleArgs.length}\n`;
         report += `  低可信信号: ${incredibleArgs.length}\n`;
-        
         if (credibleArgs.length > 0) {
             const avgCredibility = credibleArgs.reduce((a, b) => a + b.credibility.confidence, 0) / credibleArgs.length;
             report += `  平均可信度: ${avgCredibility.toFixed(2)}\n`;
@@ -799,10 +1277,37 @@ class AdvancedGameTheoryArena extends SubagentArena {
         const disclosure = this.suggestInformationDisclosure();
         report += `  建议模式: ${disclosure.mode}\n`;
         report += `  内容: ${disclosure.content}\n`;
-        report += `  预期影响: ${disclosure.expectedImpact}\n`;
-        report += `  理论依据: ${disclosure.rationale}\n\n`;
+        report += `  预期影响: ${disclosure.expectedImpact}\n\n`;
 
-        // 4. 各参与者状态
+        // 4. 议价博弈分析
+        report += '💰 议价博弈分析:\n';
+        report += '───────────────────────────────────────────\n';
+        const bargainingPhase = this.bargainingGame.getBargainingPhase();
+        report += `  当前阶段: ${bargainingPhase.phase}\n`;
+        report += `  紧迫度: ${bargainingPhase.urgency}\n`;
+        if (this.gameState.participants.length === 2) {
+            const [p1, p2] = this.gameState.participants;
+            const eq = this.bargainingGame.calculateEquilibrium(p1.discountFactor, p2.discountFactor);
+            report += `  Rubinstein均衡: P1先=${eq.player1.sharePercent}, P2先=${eq.player2.sharePercent}\n`;
+        }
+        report += '\n';
+
+        // 5. 联盟博弈分析
+        report += '🛡 联盟博弈分析:\n';
+        report += '───────────────────────────────────────────\n';
+        if (this.coalitionGame.valueFunction) {
+            const coalitionAnalysis = this.analyzeCoalition();
+            if (!coalitionAnalysis.error) {
+                report += `  Shapley总分配: ${coalitionAnalysis.shapley.totalValue.toFixed(3)}\n`;
+                report += `  核心稳定: ${coalitionAnalysis.stability.isStable ? '是 ✅' : '否 ❌'}\n`;
+                report += `  最优联盟: ${coalitionAnalysis.optimal.optimalCoalition}\n`;
+            }
+        } else {
+            report += '  (联盟价值函数未设置)\n';
+        }
+        report += '\n';
+
+        // 6. 各参与者状态
         report += '👤 参与者状态:\n';
         report += '───────────────────────────────────────────\n';
         for (const p of this.gameState.participants) {
@@ -810,7 +1315,7 @@ class AdvancedGameTheoryArena extends SubagentArena {
             report += `  【${p.name}】\n`;
             report += `    类型: ${p.speakerType}\n`;
             report += `    置信度: ${(p.confidence * 100).toFixed(0)}%\n`;
-            report += `    有证据: ${p.hasEvidence ? '是' : '否'}\n`;
+            report += `    折扣因子: ${p.discountFactor}\n`;
             report += `    策略建议: ${advice.reason}\n`;
             report += `    合作率: ${(this.repeatedGame.cooperationTracker.getCooperationRate(p.name) * 100).toFixed(0)}%\n`;
         }
@@ -818,9 +1323,6 @@ class AdvancedGameTheoryArena extends SubagentArena {
         return report;
     }
 
-    /**
-     * 获取摘要评分
-     */
     getSummaryScore() {
         const signalScore = this.argumentPool.length > 0
             ? (this.argumentPool.filter(a => a.credibility?. credible).length / this.argumentPool.length) * 100
@@ -848,5 +1350,7 @@ module.exports = {
     CooperationTracker,
     RepeatedGameEngine,
     InformationDesigner,
+    BargainingGame,
+    CoalitionGame,
     AdvancedGameTheoryArena,
 };

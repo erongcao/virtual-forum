@@ -437,17 +437,15 @@ const report = arena.generateBehavioralReport();
 
 ---
 
-## v3.8 高级博弈论版 (2026-04-18)
+## v3.9 高级博弈论完整版 (2026-04-18)
 
-实现真正的信号博弈、重复博弈和信息设计，基于：
-- **Spence (1973)** - 信号博弈理论
-- **Folk Theorem** - 无限期重复博弈
-- **Kamenica & Mandler (2012)** - 贝叶斯说服理论
+v3.8基础上新增P1级别模块：
+- **Rubinstein议价博弈** - 轮流议价模型
+- **Shapley联盟博弈** - 联盟价值分配与核心稳定性
 
-解决虚拟论坛最核心的三个问题：
-- 📡 **谁说的可信？** → 信号博弈
-- 🤝 **多轮后会合作还是撕破脸？** → 重复博弈
-- 📢 **主持人应该透露什么？** → 信息设计
+理论依据：
+- **Rubinstein (1982)** - 轮流议价均衡
+- **Shapley (1953)** - 联盟博弈核心论文
 
 ### 核心新增模块
 
@@ -456,133 +454,105 @@ const {
     SignalingGame,
     RepeatedGameEngine,
     InformationDesigner,
+    BargainingGame,      // 🆕 议价博弈
+    CoalitionGame,       // 🆕 联盟博弈
     AdvancedGameTheoryArena,
 } = require('./v3/advanced-game-theory');
+```
 
-const arena = new AdvancedGameTheoryArena();
-await arena.initArenaWithAdvancedGameTheory({
-    topic: "AI监管应该严格还是宽松",
-    participants: [
-        { name: "巴菲特", skillName: "buffett" },
-        { name: "马斯克", skillName: "musk" }
-    ],
-    discountFactors: { '巴菲特': 0.95, '马斯克': 0.85 },
-    signals: { '巴菲特': 'expert', '马斯克': 'strategic' }
+### 4. 议价博弈 (BargainingGame) [P1]
+
+**核心问题**：蛋糕如何分配？谁先出价？耐心程度如何影响结果？
+
+**Rubinstein均衡公式**：
+```
+p1_share = (1 - δ₂) / (1 - δ₁δ₂)  // P1先出价时
+p2_share = δ₂(1 - δ₁) / (1 - δ₁δ₂)
+```
+
+**功能**：
+| 函数 | 说明 |
+|------|------|
+| `calculateEquilibrium(delta1, delta2, firstMover)` | 计算均衡份额 |
+| `generateOffer(player, myDelta, oppDelta, value)` | 生成出价建议 |
+| `evaluateOffer(player, offeredShare, myDelta, oppDelta)` | 评估是否接受 |
+| `getBargainingPhase()` | 获取议价阶段分析 |
+
+**示例**：
+```javascript
+const bargaining = new BargainingGame();
+const eq = bargaining.calculateEquilibrium(0.9, 0.85, 'player1');
+// P1先出价: P1=57.9%, P2=42.1%
+
+const offer = bargaining.generateOffer('巴菲特', 0.9, 0.85, 100);
+// 返回出价建议和策略分析
+
+const eval = bargaining.evaluateOffer('马斯克', 0.35, 0.9, 0.85);
+// 返回是否应该接受当前出价
+```
+
+### 5. 联盟博弈 (CoalitionGame) [P1]
+
+**核心问题**：谁和谁结盟？收益如何公平分配？联盟是否会崩溃？
+
+**Shapley公式**：
+```
+φ_i(v) = Σ_{S⊆N\{i}} [|S|!(n-|S|-1)!/n!] × [v(S∪{i}) - v(S)]
+```
+
+**功能**：
+| 函数 | 说明 |
+|------|------|
+| `calculateShapleyValues()` | 计算Shapley值 |
+| `calculateAllCoalitions()` | 所有联盟及其价值 |
+| `checkCoreStability(shapley)` | 核心稳定性检测 |
+| `predictOptimalCoalition()` | 预测最优联盟 |
+
+**示例**：
+```javascript
+const coalition = new CoalitionGame();
+coalition.init(['巴菲特', '马斯克', '木头姐'], (S) => {
+    if (S.length === 0) return 0;
+    if (S.length === 1) return 1;
+    if (S.length === 2) return 3;
+    return 5;  // 三人联盟最大价值
 });
+
+const shapley = coalition.calculateShapleyValues();
+// { '巴菲特': 2.33, '马斯克': 2.33, '木头姐': 2.33 }
+
+const stability = coalition.checkCoreStability(shapley.shapleyValues);
+// { isStable: true, stabilityScore: 100 }
 ```
 
-### 理论实现
+### 对比: v3.8 vs v3.9
 
-#### 1. 信号博弈 (SignalingGame)
-
-**核心问题**：发言者是"真的有观点"还是"只是说说"？
-
-**均衡类型**：
-- **分离均衡 (Separating)**: 不同类型选择不同信号 → 高成本信号 = 强信念
-- **混同均衡 (Pooling)**: 不同类型选择相同信号 → 信号无信息量
-
-**信号分类**：
-| 信号类型 | 成本 | 可靠性 |
-|---------|------|--------|
-| strong_claim | 高 | 高（专家发出时） |
-| evidence_backed | 高 | 高 |
-| weak_claim | 低 | 低 |
-| assertion | 低 | 低 |
-
-**贝叶斯可信度评估**：
-```javascript
-const assessment = arena.assessArgumentCredibility('巴菲特', content);
-// 返回: { signalType, signalCost, prior, posterior, isSeparating, credible, confidence }
-```
-
-#### 2. 重复博弈 (RepeatedGameEngine)
-
-**核心问题**：多轮后会合作还是撕破脸？
-
-**战略类型**：
-| 战略 | 描述 | 适用场景 |
-|------|------|----------|
-| Grim Trigger | 一但背叛，永远惩罚 | 长期关系 |
-| Tit-for-Tat | 合作取决于对手上一轮 | 中期互动 |
-| Generous TFT | 偶尔原谅背叛 | 修复关系 |
-| Suspicious TFT | 需要两次合作才原谅 | 高对抗 |
-
-**Folk Theorem条件**：背叛收益 < 长期合作价值时，合作是均衡
-
-**合作阶段检测**：
-```javascript
-const phase = repeatedGame.getPhaseAnalysis();
-// { phase: 'COOPERATION'|'TRANSITION'|'CONFLICT', stability, risk }
-```
-
-#### 3. 信息设计 (InformationDesigner)
-
-**核心问题**：主持人应该透露多少信息？
-
-**披露模式**：
-| 模式 | 说明 | 适用场景 |
-|------|------|----------|
-| FULL | 完全披露 | 状态平衡时 |
-| STRATEGIC | 策略性披露 | 过度自信主导时 |
-| CONDITIONAL | 条件披露 | 信息不对称时 |
-
-**问题诊断**：
-- OVERCONFIDENT_DOMINANT: 多数人过度自信
-- BELIEF_DIVERGENCE: 信念分歧大
-- INFORMATION_ASYMMETRY: 信息不对称
-
-### 使用示例
-
-```javascript
-// 评估发言可信度
-const credibility = arena.assessArgumentCredibility('巴菲特', 'AI风险被高估了');
-
-// 获取策略建议
-const advice = arena.getStrategicAdvice('巴菲特', '马斯克');
-
-// 建议信息披露
-const disclosure = arena.suggestInformationDisclosure();
-
-// 综合报告
-const report = arena.generateAdvancedGameTheoryReport();
-
-// 摘要评分
-const score = arena.getSummaryScore();
-// { signalQuality: '75', cooperationLevel: '82', discussionPhase: 'COOPERATION', overallHealth: '79' }
-```
-
-### 对比: v3.7 vs v3.8
-
-| 功能 | v3.7 | v3.8 |
+| 功能 | v3.8 | v3.9 |
 |------|------|------|
-| Nash均衡 | ✅ | ✅ |
-| 贝叶斯信念更新 | ✅ | ✅ |
-| **信号博弈** | ❌ | ✅ |
-| **重复博弈/合作** | ❌ | ✅ |
-| **信息设计** | ❌ | ✅ |
-| **分离/混同均衡** | ❌ | ✅ |
-| **Folk Theorem** | ❌ | ✅ |
+| 信号博弈 | ✅ | ✅ |
+| 重复博弈 | ✅ | ✅ |
+| 信息设计 | ✅ | ✅ |
+| **议价博弈** | ❌ | ✅ |
+| **联盟博弈** | ❌ | ✅ |
+| **Shapley值** | ❌ | ✅ |
+| **核心稳定性** | ❌ | ✅ |
 
 ### 文件结构
 
 ```
 v3/
 ├── behavioral/               # 行为经济学模块
-│   ├── index.js             # 主集成模块
-│   ├── prospect-theory.js   # 前景理论引擎
-│   ├── bounded-rationality.js # 有限理性引擎
-│   └── nudge-theory.js      # 助推理论引擎
-├── behavioral-arena.js      # v3.6 行为经济学竞技场
-├── game-theory-arena.js     # v3.5 博弈论竞技场
-├── game-theory-v2.js        # v3.7 博弈论增强版
-└── advanced-game-theory.js  # v3.8 高级博弈论版 🆕
+├── behavioral-arena.js      # v3.6
+├── game-theory-arena.js     # v3.5
+├── game-theory-v2.js        # v3.7
+├── advanced-game-theory.js  # v3.9 ⭐ 完整版
+└── game-theory-v2.js       # v3.7
 ```
 
 **使用建议**：
 - 简单辩论: `SubagentArena` (v3.4)
 - 博弈论分析: `GameTheoryArena` (v3.7)
-- 深度辩论: `AdvancedGameTheoryArena` (v3.8) ← 推荐
-- 行为经济学: `BehavioralEconomicsSubagentArena` (v3.6)
+- **深度辩论（推荐）**: `AdvancedGameTheoryArena` (v3.9)
 
 ### 理论来源
 
