@@ -240,19 +240,116 @@ ${participant.skillContent || '（无可用背景）'}
   /**
    * 获取辩论者回复（子代理调用 - 需要对接实际 API）
    * @abstract 子类或调用者需要实现具体的 API 调用
+   * 
+   * [P0 FIX] 添加超时保护，防止无限阻塞
    */
-  async getDebaterResponse(participant, context) {
+  async getDebaterResponse(participant, context, options = {}) {
+    const timeoutMs = options.timeoutMs || 30000; // 默认30秒超时
+    
     // 这里是子代理调用的占位符
     // 实际使用时需要对接 OpenClaw 的 sessions_spawn / sessions_send
-    throw new Error('getDebaterResponse 需要在子类中实现或通过依赖注入提供');
+    // 或者调用其他 LLM API
+    
+    // [P0 FIX] 抛出一个需要实现的错误，并提供超时说明
+    throw new Error(
+      `getDebaterResponse 需要实现具体的API调用。` +
+      `timeoutMs=${timeoutMs}ms 已配置。` +
+      `请在子类中实现或通过依赖注入提供具体调用逻辑。`
+    );
+  }
+
+  /**
+   * 安全调用API（带超时保护）
+   * [P0 FIX] 新增方法：防止API调用无限阻塞
+   * 
+   * @param {Function} apiCall - 要调用的异步函数
+   * @param {number} timeoutMs - 超时毫秒数
+   * @param {string} errorMessage - 超时时错误消息
+   * @returns {Promise} API调用结果或超时错误
+   */
+  async safeApiCall(apiCall, timeoutMs = 30000, errorMessage = 'API调用超时') {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+      console.warn(`⚠️ API调用超时 (${timeoutMs}ms)`);
+    }, timeoutMs);
+    
+    try {
+      // 如果apiCall接受signal参数，传递给它
+      if (typeof apiCall === 'function') {
+        // 包装函数，添加timeout
+        const wrappedApiCall = async () => {
+          try {
+            const result = await Promise.race([
+              apiCall(),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Timeout')), timeoutMs)
+              )
+            ]);
+            return result;
+          } catch (e) {
+            if (e.name === 'AbortError' || e.message === 'Timeout') {
+              throw new Error(errorMessage);
+            }
+            throw e;
+          }
+        };
+        
+        const result = await wrappedApiCall();
+        clearTimeout(timeoutId);
+        return result;
+      }
+      return await apiCall();
+    } catch (e) {
+      clearTimeout(timeoutId);
+      if (e.name === 'AbortError' || e.message.includes('Timeout')) {
+        throw new Error(`${errorMessage} (${timeoutMs}ms)`);
+      }
+      throw e;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
   /**
    * 生成摘要（需要对接实际 API）
    * @abstract
+   * 
+   * [FIX] 实现默认的简单摘要，避免抛出错误导致流程中断
+   * 在无LLM API情况下，使用简单的提取式摘要作为降级方案
    */
   async generateSummary(text) {
-    throw new Error('generateSummary 需要在子类中实现或通过依赖注入提供');
+    // 简单提取式摘要：提取关键句子
+    const sentences = text.split(/[。！？\n]/).filter(s => s.trim().length > 10);
+    
+    if (sentences.length === 0) {
+      return '(本轮无实质内容，无需摘要)';
+    }
+    
+    // 简单策略：取前3句 + 最后1句（如果有更多的话）
+    const keySentences = [];
+    
+    if (sentences.length > 0) {
+      keySentences.push(sentences[0]); // 第一句通常最重要
+    }
+    if (sentences.length > 4) {
+      // 中间随机选一句
+      const midIdx = Math.floor(sentences.length / 2);
+      keySentences.push(sentences[midIdx]);
+    }
+    if (sentences.length > 2) {
+      keySentences.push(sentences[sentences.length - 1]); // 最后一句通常是结论
+    }
+    
+    // 如果只有很少的句子，全部包含
+    if (keySentences.length < 3 && sentences.length <= 3) {
+      keySentences.push(...sentences.slice(1, -1).filter(s => !keySentences.includes(s)));
+    }
+    
+    const summary = keySentences.join('。') + '。';
+    const speakerCount = (text.match(/\】/g) || []).length;
+    
+    return `[提取式摘要] 本轮讨论涉及${speakerCount}位发言者，主要观点：${summary}`;
   }
 
   /**

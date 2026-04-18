@@ -58,11 +58,16 @@ class ContextManager {
   /**
    * 获取给特定辩论者的上下文
    * 包含：最新摘要 + 滑动窗口内的完整对话
+   * 
+   * [FIX] 强制Token上限检查，避免超出模型context window
    *
    * @param {string} participantName - 参与者名称
    * @returns {string} 格式化的上下文字符串
    */
   getContextForParticipant(participantName) {
+    // [FIX] 强制Token上限检查（8K tokens = 约16000字符）
+    const MAX_CONTEXT_CHARS = 16000; // 安全阈值（8K tokens）
+    
     let context = '';
 
     // 1. 添加最新的历史摘要
@@ -76,6 +81,21 @@ class ContextManager {
     for (const round of this.currentWindow) {
       const marker = round.speaker === participantName ? '（你的发言）' : '';
       context += `[第${round.round}轮] ${round.speaker}${marker}: ${round.content}\n\n`;
+    }
+
+    // [FIX] 如果上下文超长，强制触发压缩
+    if (context.length > MAX_CONTEXT_CHARS) {
+      console.warn(`⚠️ 上下文超长 (${context.length} chars)，强制压缩`);
+      
+      // 截断到安全长度，保留摘要 + 最近2轮
+      const summaryPart = this.summaries.length > 0 
+        ? this.summaries[this.summaries.length - 1].summary 
+        : '';
+      const recentPart = this.currentWindow.slice(-2).map(r => 
+        `[第${r.round}轮] ${r.speaker}: ${r.content}`
+      ).join('\n\n');
+      
+      context = `【讨论摘要】\n${summaryPart}\n\n【最近对话】\n${recentPart}\n\n[上下文已截断]`;
     }
 
     return context;
