@@ -16,7 +16,8 @@
 | **对抗性辩论** | 争辩 → 交锋 → 胜负/共识 | 决策分歧、需要明确方向 |
 | **决策型讨论** | 多专家投票 → 加权评分 → 行动 | 需要拍板、有明确选项 |
 
-## 🧠 v3.6.1 行为经济学增强版 (2026-04-12)nn### 新增三大行为经济学理论模块nn基于经典学术著作实现：nn| 理论 | 来源 | 核心功能 |n|------|------|----------|n| **前景理论** | Kahneman & Tversky (1979) | 风险决策分析、损失厌恶、框架效应 |n| **有限理性** | Simon & Jones (1999) | 满意化决策、启发式、双系统理论 |n| **助推理论** | Thaler & Sunstein (2008) | 选择架构、社会规范、默认选项 |nn### 快速开始nn```javascriptnconst { BehavioralEconomicsSubagentArena } = require(x27./v3/behavioral-arenax27);nnconst arena = new BehavioralEconomicsSubagentArena();nawait arena.initArenaWithBehavioralEconomics({n  topic: "气候变化政策",n  participants: [n    { name: "环保主义者", position: "激进减排" },n    { name: "经济学家", position: "成本效益平衡" }n  ],n  rounds: 5n});n```nn### 新增文件nn- `v3/behavioral/` - 行为经济学模块目录n- `v3/behavioral-arena.js` - 行为经济学增强竞技场nn
+## 🧠 v3.6.1 行为经济学增强版 (2026-04-12)## 
+新增三大行为经济学理论模块nn基于经典学术著作实现：nn| 理论 | 来源 | 核心功能 |n|------|------|----------|n| **前景理论** | Kahneman & Tversky (1979) | 风险决策分析、损失厌恶、框架效应 |n| **有限理性** | Simon & Jones (1999) | 满意化决策、启发式、双系统理论 |n| **助推理论** | Thaler & Sunstein (2008) | 选择架构、社会规范、默认选项 |nn### 快速开始nn```javascriptnconst { BehavioralEconomicsSubagentArena } = require(x27./v3/behavioral-arenax27);nnconst arena = new BehavioralEconomicsSubagentArena();nawait arena.initArenaWithBehavioralEconomics({n  topic: "气候变化政策",n  participants: [n    { name: "环保主义者", position: "激进减排" },n    { name: "经济学家", position: "成本效益平衡" }n  ],n  rounds: 5n});n```nn### 新增文件nn- `v3/behavioral/` - 行为经济学模块目录n- `v3/behavioral-arena.js` - 行为经济学增强竞技场nn
 ### 🚀 v3.5 重大更新
 
 #### 1. 博弈论增强模式 (Game Theory Mode)
