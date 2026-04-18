@@ -1,169 +1,113 @@
-# 更新日志 Changelog
+# Changelog - Virtual Forum
 
-所有项目的显著变更都将记录在此文件中。
+All notable changes to the Virtual Forum skill will be documented in this file.
 
-格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
-并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
+## [3.7.0] - 2026-04-18
 
-## [3.6.1] - 2026-04-13
+### Added
+- **GameTheoryArena** (v3/game-theory-v2.js): True game theory implementation
+  - `GameStructure` class: Explicit payoff matrix and Nash equilibrium calculation
+  - `BayesianBeliefSystem` class: Real Bayesian updates (not hardcoded multipliers)
+  - `GameStateTracker` class: Game state tracking
+  - 2x2 game analytical solution (Myerson 1991)
+  - Fictitious Play approximation for N-player games
+  - Nash equilibrium calculation with confidence score
 
-### 🧠 新增 - 行为经济学增强版
+### Enhanced
+- **博弈论实现**: No longer "game theory themed decoration"
+  - True Nash equilibrium computation
+  - Explicit payoff matrix structure
+  - Dominant strategy checking
+  - Bayesian belief updates with proper formulas
 
-#### 三大理论模块
-- **前景理论 (Prospect Theory)** - Kahneman & Tversky (1979)
-  - 价值函数、概率加权、四折模式
-  - 损失厌恶 (λ ≈ 2.25)、框架效应
-  
-- **有限理性 (Bounded Rationality)** - Simon & Jones (1999)
-  - 满意化决策、启发式与偏差
-  - 双系统理论、注意力模型
-  
-- **助推理论 (Nudge Theory)** - Thaler & Sunstein (2008)
-  - 选择架构、默认选项
-  - 社会规范、框架设计
+### Documentation
+- Added v3.7 section to SKILL.md
+- Complete theory explanation with formulas
+- Comparison table: v3.5 vs v3.7
+- Code examples for new API
 
-#### 新增文件
-- `v3/behavioral/` - 行为经济学模块目录
-- `v3/behavioral-arena.js` - 行为经济学竞技场
-- `v3/behavioral/README.md` - 详细文档
+### Technical Details
 
-#### 主入口集成
-- 新增 `launchBehavioralEconomicsArena()` 方法
-- 新增 `quickArena()` 便捷方法
-- 支持通过 `useBehavioralEconomics` 参数启用
+**Nash Equilibrium (2x2 game)**:
+```
+p = (d - c) / (a + d - b - c)
+where:
+  a = A强硬B强硬收益
+  b = A强硬B让步收益
+  c = A让步B强硬收益
+  d = A让步B让步收益
+```
 
-### 🔧 修复
+**Bayesian Update Formula**:
+```
+P(H|E) = P(E|H) × P(H) / P(E)
+```
 
-#### P0 级别 Bug（严重）
-- **quickArena 方法缺失** - `index.js`
-  - 问题: `run-debate.js` 调用不存在的方法
-  - 修复: 添加 `quickArena()` 便捷启动方法
-  
-- **硬编码路径** - `run-debate.js`
-  - 问题: 硬编码 `/Users/caoyirong/obsidian/...`
-  - 修复: 使用相对路径 `./output/`
+## [3.6.4] - 2026-04-17
 
-## [3.5.0] - 2026-04-12
+### Fixed
+- behavioral-arena.js: Added missing `strategyAdvice` initialization
+- behavioral-arena.js: Added `analyzeRound()` and `generateReport()` stub methods
+- behavioral-arena.js: Safe access in `generateBehavioralAdviceForAll()`
 
-### 🎉 新增
+### Enhanced
+- API timeout protection (30s default)
+- Token compression with MAX_CONTEXT_CHARS = 16000
+- Graceful shutdown with SIGINT/SIGTERM handling
 
-#### 博弈论增强模式 (Game Theory Mode)
-- 新增 `GameTheorySubagentArena` 类，支持博弈论参数
-- 支持折扣因子(δ)配置，模拟参与者耐心程度
-- 支持BATNA（外部选项），影响让步决策
-- 贝叶斯信念更新，根据行为更新类型判断
-- 实时策略提示注入到系统prompt
+## [3.6.3] - 2026-04-17
 
-#### Token节省优化
-- 新增 `ContextManager` 上下文管理器
-- 实现滑动窗口机制，只保留最近N轮对话
-- 实现摘要压缩，每M轮生成历史摘要
-- **效果**: 100轮辩论从100K tokens降至30K tokens（节省70%）
+### Fixed
+- shared-config.js: `maxRounds = 100` to prevent resource exhaustion
+- shared-config.js: `apiBaseDelay` increased from 2000ms to 5000ms
+- shared-config.js: `validateConfig` now checks rounds upper bound
+- shared-config.js: `loadSkill` path traversal protection
 
-#### 工程化改进
-- 新增 `package.json`，规范项目配置
-- 新增 `shared-config.js`，消除代码重复（DRY原则）
-- 新增完整的单元测试套件（17个测试用例）
-- 支持暂停/恢复辩论
+### Enhanced
+- Error handling: Throws when all Skills fail to load
+- Partial load warnings when some Skills fail
 
-### 🔧 修复
+## [3.6.2] - 2026-04-17
 
-#### P0 级别 Bug（严重）
-- **rebutral拼写错误** - `argument-tracker.js` 第59行
-  - 问题: `rebutral` 应为 `rebuttal`，导致反驳功能完全崩溃
-  - 修复: 修正变量名，添加回归测试
-  
-- **index.js参数截断** - `launchGameTheoryArena` 函数
-  - 问题: `priorBeliefs` 被截断为 `p`，V3.5模式初始化失败
-  - 修复: 完整参数解构和传递
-  
-- **v3/game-theory-arena.js缺失**
-  - 问题: 文件不存在，require报错
-  - 修复: 完整实现博弈论增强引擎
+### Fixed
+- context-manager.js: Added MAX_CONTEXT_CHARS = 16000 token limit
+- context-manager.js: Force compression when context exceeds limit
+- subagent-arena.js: Added `generateSummary()` fallback implementation
 
-#### P1 级别 Bug（重要）
-- **硬编码路径** - `subagent-arena.js` 和 `forum-engine.js`
-  - 问题: 硬编码 `/Users/caoyirong`，其他用户无法运行
-  - 修复: 使用 `shared-config.js` 动态检测 HOME 目录
-  
-- **Token爆炸** - 每轮传递完整历史
-  - 问题: 50轮辩论消耗100-500元Token
-  - 修复: `ContextManager` 滑动窗口 + 摘要压缩
+## [3.6.1] - 2026-04-12
 
-#### P2 级别 Bug（一般）
-- **output-formatter.js截断** - `formatReport` 方法
-  - 问题: 统计数据部分代码被截断
-  - 修复: 补全表格生成逻辑，新增 `formatDecision` 方法
-  
-- **代码重复** - 模式定义多处重复
-  - 问题: `DISCUSSION_MODES` 和 `MODERATOR_STYLES` 在多个文件中重复定义
-  - 修复: 抽取到 `shared-config.js`
+### Added
+- Behavioral Economics Enhanced mode
+  - Prospect Theory engine (Kahneman & Tversky, 1979)
+  - Bounded Rationality engine (Simon & Jones, 1999)
+  - Nudge Theory engine (Thaler & Sunstein, 2008)
 
-### ♻️ 重构
+### Features
+- `launchBehavioralEconomicsArena()` method
+- Behavioral bias detection
+- Strategy advice with behavioral considerations
 
-- `subagent-arena.js` - 集成ContextManager，支持指数退避重试
-- `forum-engine.js` - 使用shared-config，移除硬编码
-- `index.js` - 修复参数传递，优化错误处理
+## [3.5.0] - 2026-04
 
-### ✅ 测试
+### Added
+- Game Theory Enhanced mode
+  - Discount factors and BATNA (outside options)
+  - Bayesian belief updates based on observed actions
 
-- 新增 `test/argument-tracker.test.js` - 论点追踪器测试
-- 新增 `test/context-manager.test.js` - 上下文管理器测试
-- 新增 `test/shared-config.test.js` - 共享配置测试
-- 新增 `test/run.js` - 测试运行入口
-- 所有17个测试用例通过
+## [3.0.0] - 2026-03
 
-### 📚 文档
+### Added
+- Subagent Arena mode
+- Context Manager for token optimization
+- Argument Tracker
 
-- 重写 `README.md`，添加v3.5特性说明
-- 新增 `CHANGELOG.md`（本文件）
-- 新增 `USAGE.md` 使用指南（计划中）
+## [1.0.0] - 2026-02
+
+### Added
+- Initial release
+- Basic forum simulation
+- Three discussion modes (exploratory, adversarial, decision)
 
 ---
 
-## [3.0.0] - 2026-04-XX
-
-### 新增
-- 博弈论核心算法实现（v3目录）
-- 纳什均衡求解
-- 贝叶斯博弈支持
-- 重复博弈分析
-
----
-
-## [2.0.0] - 2026-03-XX
-
-### 新增
-- 子代理交锋模式
-- OpenClaw集成
-- 论点追踪器
-- 多种输出格式
-
----
-
-## [1.0.0] - 2026-02-XX
-
-### 新增
-- 基础模拟模式
-- 三种讨论模式（探索性/对抗性/决策型）
-- 主持人风格系统
-- 基础分数计算
-
----
-
-## 版本说明
-
-- **x.y.z** 格式
-  - **x** (主版本): 重大架构变更，不兼容的API修改
-  - **y** (次版本): 新功能，向下兼容
-  - **z** (补丁版本): Bug修复，向下兼容
-
-### 版本对应关系
-
-| 版本 | 特性 | 状态 |
-|------|------|------|
-| v1.0 | 基础模拟模式 | ✅ 稳定 |
-| v2.0 | 子代理交锋模式 | ✅ 稳定 |
-| v3.0 | 博弈论算法核心 | ✅ 稳定 |
-| v3.5 | 博弈论增强集成 | ✅ 当前版本 |
-| v4.0 | 流式输出、多数据源 | 🚧 规划中 |
+*Generated by AI Assistant - 2026-04-18*

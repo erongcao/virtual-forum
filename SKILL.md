@@ -269,6 +269,124 @@ await arena.initArenaWithBehavioralEconomics({
 });
 ```
 
+---
+
+## v3.7 博弈论增强版 (2026-04-18)
+
+实现真正的博弈论计算，不再是"博弈论主题装饰"。基于：
+- **Myerson (1991)** - Nash均衡计算公式
+- **Fudenberg & Tirole (1991)** - 博弈论经典教材
+- **Brown (1951)** - Fictitious Play学习动态
+
+### 核心新增模块
+
+```javascript
+// 真正的博弈论框架
+const { GameTheoryArena, GameStructure, BayesianBeliefSystem } = require('./v3/game-theory-v2');
+
+const arena = new GameTheoryArena();
+await arena.initArenaWithGameTheory({
+  topic: "NVDA估值是否合理",
+  participants: [
+    { name: "巴菲特", skillName: "buffett" },
+    { name: "木头姐", skillName: "cathie-wood" }
+  ],
+  discountFactors: { '巴菲特': 0.95, '木头姐': 0.85 },
+  outsideOptions: { '巴菲特': 15, '木头姐': 5 }
+});
+
+// 计算Nash均衡
+const eq = arena.calculateNashEquilibrium();
+// 输出: { type: 'mixed', player1: {prob: 0.7}, player2: {prob: 0.6}, confidence: 0.9 }
+
+// 获取博弈论报告
+console.log(arena.getGameTheoryReport());
+```
+
+### 理论实现
+
+#### 1. 博弈结构 (GameStructure)
+
+显式定义支付矩阵和策略空间：
+- **策略空间**: 每个参与者可选择"强硬"或"让步"
+- **支付矩阵**: 博弈收益的完整映射
+- **Nash均衡计算**: 2x2博弈使用解析公式，更复杂博弈使用Fictitious Play近似
+
+#### 2. Nash均衡计算
+
+**2x2博弈解析解** (Myerson 1991):
+
+```
+p = (d - c) / (a + d - b - c)
+其中:
+a = A强硬B强硬的收益
+b = A强硬B让步的收益
+c = A让步B强硬的收益
+d = A让步B让步的收益
+```
+
+**N人博弈**: 使用Fictitious Play迭代逼近均衡
+
+#### 3. 贝叶斯信念更新 (BayesianBeliefSystem)
+
+真正的贝叶斯更新，非硬编码乘数：
+
+```
+P(H|E) = P(E|H) × P(H) / P(E)
+
+// 例如：观察到攻击性行为 → 更新对手类型信念
+posterior = bayesianUpdate('对手', 'aggressive')
+// 返回: { prior, posterior, updateStrength }
+```
+
+### 博弈论功能
+
+#### 均衡分析
+```javascript
+const eq = arena.calculateNashEquilibrium();
+// { type: 'mixed', confidence: 0.95, equilibriumPayoff: 45.2 }
+```
+
+#### 策略建议
+```javascript
+// 基于均衡分析生成策略建议
+const advice = arena.getStrategyAdvice('巴菲特');
+// 返回: { shouldConcede: false, utility: 38.5, reason: '...' }
+```
+
+#### 贝叶斯预测
+```javascript
+const prediction = arena.beliefSystem.predict('木头姐');
+// 返回: { type: 'growth', confidence: 0.78 }
+```
+
+### 对比: v3.5 vs v3.7
+
+| 功能 | v3.5 | v3.7 |
+|------|------|------|
+| 折扣因子 | ✅ | ✅ |
+| BATNA外部选项 | ✅ | ✅ |
+| 贝叶斯更新 | ⚠️ 硬编码乘数 | ✅ 真正的贝叶斯 |
+| Nash均衡 | ❌ | ✅ 解析解+Fictitious Play |
+| 支付矩阵 | ⚠️ 隐式 | ✅ 显式定义 |
+| 占优策略检验 | ❌ | ✅ |
+| 博弈树/逆向归纳 | ❌ | 🔜 后续版本 |
+
+### 文件结构
+
+```
+v3/
+├── behavioral/               # 行为经济学模块
+├── behavioral-arena.js      # v3.6 行为经济学竞技场
+├── game-theory-arena.js     # v3.5 博弈论竞技场（基础版）
+└── game-theory-v2.js        # v3.7 博弈论竞技场（真正实现）🆕
+```
+
+**使用建议**：
+- 简单辩论使用 `SubagentArena` (v3.4)
+- 博弈论分析使用 `GameTheoryArena` (v3.7) ← 推荐
+- 行为经济学 + 博弈论使用 `BehavioralEconomicsSubagentArena` (v3.6)
+
 ### 行为经济学功能
 
 #### 1. 前景理论引擎
