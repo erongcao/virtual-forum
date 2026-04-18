@@ -27,8 +27,10 @@
 ```
 javascriptnconst { BehavioralEconomicsSubagentArena } = require(x27./v3/behavioral-arenax27);
 const arena = new BehavioralEconomicsSubagentArena();
-await arena.initArenaWithBehavioralEconomics({topic: "气候变化政策", participants:
- [ { name: "环保主义者", position: "激进减排" }, { name: "经济学家", position: "成本效益平衡" } ], rounds: 5n});
+await arena.initArenaWithBehavioralEconomics(
+  {topic: "气候变化政策",
+   participants:
+       [ { name: "环保主义者", position: "激进减排" }, { name: "经济学家", position: "成本效益平衡" } ], rounds: 5});
 ```
 
 ### 新增文件
