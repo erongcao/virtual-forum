@@ -17,6 +17,58 @@ class BehavioralEconomicsSubagentArena extends GameTheorySubagentArena {
     this.beArena = new BehavioralEconomicsArena();
     this.behavioralContext = null;
     this.roundInsights = [];
+    this.strategyAdvice = {};  // [FIX] 初始化未定义的strategyAdvice
+  }
+
+  /**
+   * [FIX] 基础博弈论分析 - 需要实现或由子类覆盖
+   * 用于 analyzeRoundWithBehavioral() 方法
+   */
+  async analyzeRound(roundNumber, roundData) {
+    // 基础实现：返回空分析结果
+    // 子类可覆盖以提供具体的博弈论分析
+    return {
+      round: roundNumber,
+      gameType: 'mixed_strategy',
+      equilibrium: null,
+      riskLevel: 0.5,
+      recommendations: []
+    };
+  }
+
+  /**
+   * [FIX] 生成报告 - 需要实现或由子类覆盖
+   * 用于 generateBehavioralReport() 方法
+   */
+  generateReport() {
+    // 基础实现：返回当前arena的基本报告
+    // 子类可覆盖以提供更详细的博弈论报告
+    const debateHistory = this.arena?.debateHistory || [];
+    const participantScores = this.arena?.scores || {};
+    
+    return {
+      id: this.arena?.id || Date.now(),
+      topic: this.arena?.topic || 'Unknown',
+      mode: this.arena?.mode || 'adversarial',
+      rounds: this.arena?.rounds || 0,
+      participants: (this.arena?.participants || []).map(p => p.name),
+      totalRounds: debateHistory.length,
+      scores: participantScores,
+      debateHistory: debateHistory.slice(-10),  // 最近10轮
+      summary: this._generateBasicSummary(debateHistory),
+      recommendations: []
+    };
+  }
+
+  /**
+   * 生成基本摘要
+   */
+  _generateBasicSummary(debateHistory) {
+    if (!debateHistory || debateHistory.length === 0) {
+      return '无讨论记录';
+    }
+    const speakers = [...new Set(debateHistory.map(h => h.speaker))];
+    return `${speakers.length}位参与者进行了${debateHistory.length}轮讨论`;
   }
 
   /**
@@ -62,6 +114,10 @@ class BehavioralEconomicsSubagentArena extends GameTheorySubagentArena {
         audienceProfile: { riskAverse: true, socialConscious: true }
       });
       
+      // [FIX] 安全地初始化strategyAdvice
+      if (!this.strategyAdvice[p.name]) {
+        this.strategyAdvice[p.name] = {};
+      }
       this.strategyAdvice[p.name] = {
         ...this.strategyAdvice[p.name],
         behavioral: advice
