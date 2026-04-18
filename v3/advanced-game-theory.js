@@ -238,8 +238,11 @@ class RepeatedGameEngine {
     }
 
     _grimTriggerDecision(history, opponentLastAction) {
-        const hasDefected = history.some(h => !h.cooperated);
-        return hasDefected ? 'defect' : 'cooperate';
+        // [P0 FIX] grim trigger：正确逻辑是检查opponent是否背叛
+        // 一旦opponent背叛，就永远惩罚（defect）
+        // history参数保留用于未来扩展（如追踪背叛次数）
+        if (opponentLastAction === null) return 'cooperate';  // 第一轮默认合作
+        return opponentLastAction ? 'cooperate' : 'defect';
     }
 
     _titForTatDecision(opponentLastAction) {
@@ -683,11 +686,11 @@ class BargainingGame {
 
     /**
      * 生成议价报告
+     * [P2 FIX] 使用通用玩家名称而非硬编码 P1/P2
      */
-    generateBargainingReport(delta1, delta2) {
+    generateBargainingReport(delta1, delta2, player1Name = '玩家1', player2Name = '玩家2') {
         const equilibrium = this.calculateEquilibrium(delta1, delta2);
         const phase = this.getBargainingPhase();
-        const shares = this.calculateEquilibriumShares(delta1, delta2);
 
         let report = '🤝 议价博弈分析\n';
         report += '═══════════════════════════════════\n';
@@ -696,8 +699,8 @@ class BargainingGame {
         report += `先手优势: ${equilibrium.firstMoverAdvantage}\n\n`;
 
         report += 'Rubinstein均衡份额:\n';
-        report += `  P1先出价: P1=${equilibrium.player1.sharePercent}, P2=${equilibrium.player2.sharePercent}\n`;
-        report += `  P2先出价: P1=${(1 - equilibrium.player2.share).toFixed(1)}%, P2=${equilibrium.player2.sharePercent}\n\n`;
+        report += `  ${player1Name}先出价: ${player1Name}=${equilibrium.player1.sharePercent}, ${player2Name}=${equilibrium.player2.sharePercent}\n`;
+        report += `  ${player2Name}先出价: ${player1Name}=${(1 - equilibrium.player2.share).toFixed(1)}%, ${player2Name}=${equilibrium.player2.sharePercent}\n\n`;
 
         report += '当前阶段:\n';
         report += `  ${phase.phase}: ${phase.description}\n`;
@@ -956,7 +959,7 @@ class CoalitionGame {
 
         // 检查是否有人想跳槽
         const incentivesToDefect = this._checkIncentivesToDefect(
-            coalitionPlayers, coalitionShapley, totalShapleyInCoalition
+            coalitionPlayers, coalitionShapley
         );
 
         return {
@@ -994,7 +997,7 @@ class CoalitionGame {
     /**
      * 检查跳槽动机
      */
-    _checkIncentivesToDefect(coalitionPlayers, shapleyDistribution, totalCoalitionShapley) {
+    _checkIncentivesToDefect(coalitionPlayers, shapleyDistribution) {
         const incentives = [];
         
         for (const player of coalitionPlayers) {

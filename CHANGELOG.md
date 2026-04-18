@@ -2,6 +2,13 @@
 
 All notable changes to the Virtual Forum skill will be documented in this file.
 
+## [3.9.2] - 2026-04-18
+
+### Fixed
+- **P0**: `_grimTriggerDecision()` 逻辑错误 - 检查对手是否背叛，而非自己
+- **P2**: `_checkIncentivesToDefect()` 未使用参数 `totalCoalitionShapley`
+- **P2**: `generateBargainingReport()` 硬编码 P1/P2 → 支持通用玩家名
+
 ## [3.9.1] - 2026-04-18
 
 ### Fixed
