@@ -1,13 +1,32 @@
 #!/bin/bash
-# 并行地缘政治辩论脚本
+# 并行地缘政治辩论脚本 v5.0.1
 # 使用 Claude Code 并行启动多个参与者
+#
+# v5.0.1 改进：
+# - 添加 trap 处理异常退出
+# - 添加超时控制（每轮5分钟）
+# - 改进临时文件管理
+
+set -o pipefail
 
 SKILLS_DIR="$HOME/.openclaw/workspace/skills"
 OUTPUT_DIR="$HOME/Obsidian/我的远程库/虚拟论坛"
 TOPIC="2026年美国、以色列、伊朗三国战争走向"
 ROUNDS=10
+CLAUDE_TIMEOUT=300  # 每轮超时5分钟
+MAX_RETRIES=3      # 最大重试次数
 
 mkdir -p "$OUTPUT_DIR"
+
+# 临时文件清理函数
+cleanup() {
+    local exit_code=$?
+    rm -f /tmp/*_resp_$$.txt /tmp/debate_history_$$.txt 2>/dev/null
+    exit $exit_code
+}
+
+# 注册清理函数
+trap cleanup EXIT INT TERM
 
 # 读取skill内容
 read_skill() {
@@ -18,6 +37,38 @@ read_skill() {
     else
         echo "（无可用背景）"
     fi
+}
+
+# 调用Claude Code（带超时和重试）
+call_claude() {
+    local prompt="$1"
+    local max_time=${2:-$CLAUDE_TIMEOUT}
+    local retries=0
+    
+    while [ $retries -lt $MAX_RETRIES ]; do
+        # 使用 timeout 命令设置超时
+        local result
+        result=$(echo "$prompt" | timeout "$max_time" claude --print --system-prompt "$SYSTEM_PROMPT" 2>/dev/null)
+        local exit_code=$?
+        
+        if [ $exit_code -eq 0 ]; then
+            echo "$result"
+            return 0
+        elif [ $exit_code -eq 124 ]; then
+            echo "（超时）" >&2
+            return 1
+        elif [ $exit_code -eq 7 ]; then
+            # API错误，稍后重试
+            retries=$((retries + 1))
+            sleep 5
+        else
+            retries=$((retries + 1))
+            sleep 2
+        fi
+    done
+    
+    echo "（调用失败）"
+    return 1
 }
 
 # 参与者列表
@@ -81,7 +132,7 @@ STARMER_PROMPT=$(build_system_prompt "斯塔默" "$STARMER_SKILL")
 HISTORY_FILE="/tmp/debate_history_$$.txt"
 echo "" > "$HISTORY_FILE"
 
-echo "🚀 开始10轮辩论..."
+echo "🚀 开始${ROUNDS}轮辩论..."
 echo "=" "TOPIC: $TOPIC"
 echo ""
 
@@ -94,9 +145,6 @@ run_round() {
     # 获取当前历史上下文
     HISTORY=$(cat "$HISTORY_FILE")
     
-    # 并行启动所有参与者的回应
-    # 注意：Claude Code --print 模式
-    
     # 构建用户消息
     USER_MSG="【第${round}轮发言请求】
 
@@ -107,50 +155,58 @@ $HISTORY}
 
 请针对以上讨论，以你的角色身份发表本轮发言。"
 
-    # 并行调用（使用后台进程）
-    TRUMP_RESP=""
-    NETANYAHU_RESP=""
-    PEZESHKIAN_RESP=""
-    VANCE_RESP=""
-    PUTIN_RESP=""
-
-    # 为每个参与者启动Claude Code进程
+    # 清空临时响应文件
+    rm -f /tmp/*_resp_$$.txt
+    
+    # 并行启动所有参与者的回应
     echo "  启动并行发言..."
     
     # 特朗普
     (
-        echo "$USER_MSG" | claude --print --system-prompt "$TRUMP_PROMPT" 2>/dev/null >> /tmp/trump_resp_$$.txt
+        SYSTEM_PROMPT="$TRUMP_PROMPT" call_claude "$USER_MSG" >> /tmp/trump_resp_$$.txt
     ) &
+    local trump_pid=$!
     
     # 内塔尼亚胡
     (
-        echo "$USER_MSG" | claude --print --system-prompt "$NETANYAHU_PROMPT" 2>/dev/null >> /tmp/netanyahu_resp_$$.txt
+        SYSTEM_PROMPT="$NETANYAHU_PROMPT" call_claude "$USER_MSG" >> /tmp/netanyahu_resp_$$.txt
     ) &
+    local netanyahu_pid=$!
     
     # 佩泽希齐扬
     (
-        echo "$USER_MSG" | claude --print --system-prompt "$PEZESHKIAN_PROMPT" 2>/dev/null >> /tmp/pezeshkian_resp_$$.txt
+        SYSTEM_PROMPT="$PEZESHKIAN_PROMPT" call_claude "$USER_MSG" >> /tmp/pezeshkian_resp_$$.txt
     ) &
+    local pezeshkian_pid=$!
     
     # 万斯
     (
-        echo "$USER_MSG" | claude --print --system-prompt "$VANCE_PROMPT" 2>/dev/null >> /tmp/vance_resp_$$.txt
+        SYSTEM_PROMPT="$VANCE_PROMPT" call_claude "$USER_MSG" >> /tmp/vance_resp_$$.txt
     ) &
+    local vance_pid=$!
     
     # 普京
     (
-        echo "$USER_MSG" | claude --print --system-prompt "$PUTIN_PROMPT" 2>/dev/null >> /tmp/putin_resp_$$.txt
+        SYSTEM_PROMPT="$PUTIN_PROMPT" call_claude "$USER_MSG" >> /tmp/putin_resp_$$.txt
     ) &
+    local putin_pid=$!
     
-    # 等待所有进程完成
-    wait
+    # 等待所有进程完成（带超时保护）
+    local all_pids="$trump_pid $netanyahu_pid $pezeshkian_pid $vance_pid $putin_pid"
+    local timed_out=0
     
-    # 读取响应
-    TRUMP_RESP=$(cat /tmp/trump_resp_$$.txt 2>/dev/null || echo "（未响应）")
-    NETANYAHU_RESP=$(cat /tmp/netanyahu_resp_$$.txt 2>/dev/null || echo "（未响应）")
-    PEZESHKIAN_RESP=$(cat /tmp/pezeshkian_resp_$$.txt 2>/dev/null || echo "（未响应）")
-    VANCE_RESP=$(cat /tmp/vance_resp_$$.txt 2>/dev/null || echo "（未响应）")
-    PUTIN_RESP=$(cat /tmp/putin_resp_$$.txt 2>/dev/null || echo "（未响应）")
+    for pid in $all_pids; do
+        if ! wait $pid; then
+            timed_out=1
+        fi
+    done
+    
+    # 读取响应（带默认值）
+    local TRUMP_RESP=$(cat /tmp/trump_resp_$$.txt 2>/dev/null || echo "（未响应）")
+    local NETANYAHU_RESP=$(cat /tmp/netanyahu_resp_$$.txt 2>/dev/null || echo "（未响应）")
+    local PEZESHKIAN_RESP=$(cat /tmp/pezeshkian_resp_$$.txt 2>/dev/null || echo "（未响应）")
+    local VANCE_RESP=$(cat /tmp/vance_resp_$$.txt 2>/dev/null || echo "（未响应）")
+    local PUTIN_RESP=$(cat /tmp/putin_resp_$$.txt 2>/dev/null || echo "（未响应）")
     
     # 清理临时文件
     rm -f /tmp/*_resp_$$.txt
@@ -178,7 +234,7 @@ $HISTORY}
     
     # 主持人总结（顺序执行）
     echo "  主持人总结..."
-    SUMMARY_CONTEXT="这是第${round}轮讨论。各方发言如下：
+    local SUMMARY_CONTEXT="这是第${round}轮讨论。各方发言如下：
 
 【特朗普】：$TRUMP_RESP
 【内塔尼亚胡】：$NETANYAHU_RESP
@@ -188,12 +244,15 @@ $HISTORY}
 
 请以斯塔默的身份，对本轮讨论进行简要总结（100字以内）。"
 
-    SUMMARY=$(echo "$SUMMARY_CONTEXT" | claude --print --system-prompt "$STARMER_PROMPT" 2>/dev/null || echo "（主持人未响应）")
+    SYSTEM_PROMPT="$STARMER_PROMPT" SUMMARY=$(call_claude "$SUMMARY_CONTEXT" 120) || SUMMARY="（主持人未响应）"
     
     echo "【斯塔默总结】(第${round}轮)" >> "$HISTORY_FILE"
     echo "$SUMMARY" >> "$HISTORY_FILE"
     echo "" >> "$HISTORY_FILE"
     
+    if [ $timed_out -eq 1 ]; then
+        echo "  ⚠️ 部分进程超时"
+    fi
     echo "  ✅ 第${round}轮完成"
 }
 
@@ -226,9 +285,6 @@ $(cat "$HISTORY_FILE")
 # 保存报告
 OUTPUT_FILE="${OUTPUT_DIR}/虚拟论坛-2026美以伊战争-ClaudeCode.md"
 echo "$REPORT" > "$OUTPUT_FILE"
-
-# 清理
-rm -f "$HISTORY_FILE"
 
 echo ""
 echo "✅ 辩论完成！"

@@ -571,7 +571,7 @@ class GameTheoryArena extends SubagentArena {
             report += `  应该让步: ${this.shouldConcede(name) ? '是 ⚠️' : '否'}\n`;
             
             if (beliefPrediction) {
-                report += `  贝叶斯预测类型: ${beliefPrediction.type} (${(beliefPrediction.confidence * 100).toFixed(0)%})\n`;
+                report += `  贝叶斯预测类型: ${beliefPrediction.type} (${((beliefPrediction.confidence * 100).toFixed(0))}%)\n`;
             }
             
             if (Object.keys(state.beliefs).length > 0) {

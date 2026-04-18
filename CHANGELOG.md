@@ -2,6 +2,21 @@
 
 All notable changes to the Virtual Forum skill will be documented in this file.
 
+## [5.0.1] - 2026-04-18
+
+### Fixed
+- **P0**: `v3/game-theory-v2.js` 第574行模板字符串语法错误
+  - 修复：`${(x).toFixed(0)%}` → `${((x).toFixed(0))}%`
+- **Shell脚本加固**:
+  - 添加 `trap` 处理异常退出（临时文件清理）
+  - 添加超时控制（每轮5分钟）
+  - 添加API重试机制（最多3次）
+  - 改进进程等待逻辑
+
+### Improved
+- 错误处理更健壮
+- 临时文件管理更安全
+
 ## [5.0.0] - 2026-04-18
 
 ### Breaking Change

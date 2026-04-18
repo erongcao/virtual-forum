@@ -1,8 +1,8 @@
-# 🎭 虚拟论坛 Virtual Forum v5.0
+# 🎭 虚拟论坛 Virtual Forum v5.0.1
 
 > 让蒸馏的人物Skill就特定话题展开真正的多Agent并行辩论
 
-[![Version](https://img.shields.io/badge/version-5.0.0-blue.svg)](https://github.com/erongcao/virtual-forum)
+[![Version](https://img.shields.io/badge/version-5.0.1-blue.svg)](https://github.com/erongcao/virtual-forum)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 ---
