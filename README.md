@@ -23,8 +23,11 @@
 | **前景理论** | Kahneman & Tversky (1979) | 风险决策分析、损失厌恶、框架效应 |
 | **有限理性** | Simon & Jones (1999) | 满意化决策、启发式、双系统理论 |
 | **助推理论** | Thaler & Sunstein (2008) | 选择架构、社会规范、默认选项 |
-### 快速开始###
-```javascriptnconst { BehavioralEconomicsSubagentArena } = require(x27./v3/behavioral-arenax27);nnconst arena = new BehavioralEconomicsSubagentArena();nawait arena.initArenaWithBehavioralEconomics({n  topic: "气候变化政策",n  participants: [n    { name: "环保主义者", position: "激进减排" }, { name: "经济学家", position: "成本效益平衡" } ], rounds: 5n});```
+### 快速开始
+```javascriptnconst { BehavioralEconomicsSubagentArena } = require(x27./v3/behavioral-arenax27);
+const arena = new BehavioralEconomicsSubagentArena();
+await arena.initArenaWithBehavioralEconomics({topic: "气候变化政策", participants:
+ [ { name: "环保主义者", position: "激进减排" }, { name: "经济学家", position: "成本效益平衡" } ], rounds: 5n});```
 ### 新增文件
 `v3/behavioral/` - 行为经济学模块目录
 `v3/behavioral-arena.js` - 行为经济学增强竞技场
