@@ -2,6 +2,24 @@
 
 All notable changes to the Virtual Forum skill will be documented in this file.
 
+## [5.0.2] - 2026-04-18
+
+### Breaking Change
+- **移除**: v3/ 和 v4/ 目录（已废弃代码已删除）
+
+### Reorganized
+- **移动**: 博弈论模块移至 `v5/game-theory/`
+  - advanced-game-theory.js
+  - game-theory-v2.js
+  - game-theory-arena.js
+  - behavioral-arena.js
+  - advanced/, core/, behavioral/, extensions/ 子目录
+- **新增**: `v5/game-theory/README.md` 博弈论模块文档
+
+### Updated
+- README.md 目录结构已更新
+- SKILL.md 描述已更新
+
 ## [5.0.1] - 2026-04-18
 
 ### Fixed

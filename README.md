@@ -72,15 +72,20 @@ virtual-forum/
 ├── SKILL.md                    # Skill完整文档
 ├── USAGE.md                    # 详细使用指南
 ├── package.json                # 项目配置
-├── index.js                    # Node.js API入口
-├── v5/                        # ⭐ v5.0 Claude Code方案
-│   ├── README.md              # v5.0说明
-│   └── debate_parallel.sh      # 并行辩论脚本
-├── v3/                        # v3.x博弈论模块
-│   ├── game-theory-arena.js   # 博弈论引擎
-│   ├── behavioral-arena.js    # 行为经济学
-│   └── advanced-game-theory.js # 高级博弈论
-├── subagent-arena.js          # v2.0子代理引擎（废弃）
+├── v5/                        # ⭐ v5.0 主方案
+│   ├── debate_parallel.sh      # Claude Code并行辩论脚本
+│   ├── game-theory/            # 博弈论分析模块
+│   │   ├── README.md         # 博弈论模块说明
+│   │   ├── advanced-game-theory.js  # 高级博弈论
+│   │   ├── game-theory-v2.js        # v3.7博弈论引擎
+│   │   ├── game-theory-arena.js     # 博弈论竞技场
+│   │   ├── behavioral-arena.js      # 行为经济学
+│   │   ├── advanced/           # 高级模块
+│   │   ├── core/               # 核心算法
+│   │   ├── behavioral/         # 行为经济学
+│   │   └── extensions/         # 扩展
+│   └── README.md              # v5.0说明
+├── subagent-arena.js          # 旧版子代理引擎（废弃）
 └── test/                      # 单元测试
 ```
 

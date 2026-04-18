@@ -1,30 +1,24 @@
 ---
 name: virtual-forum
 description: |
-  虚拟论坛：让蒸馏的人物Skill就特定话题展开讨论。支持v3.x、v4.0和v5.0。
+  虚拟论坛：让蒸馏的人物Skill就特定话题展开讨论。
   v5.0使用Claude Code CLI实现真正的多agent并行辩论。
+  内置博弈论分析模块（信号博弈、议价博弈、联盟博弈、行为经济学）。
   触发词：「虚拟论坛」「发起讨论」「圆桌会议」「辩论」「主持讨论」「让XX YY讨论」
-version: 5.0.0
+version: 5.0.2
 ---
 
 # 🎭 虚拟论坛 Virtual Forum v5.0
 
 > "让思想碰撞，让智慧涌现。"
 
-## ⚠️ v5.0 推荐方案
+## v5.0 架构
 
-**v5.0 使用外部CLI实现真正的多agent并行**：
-- 使用 `bash` + `claude --print` 调用Claude Code CLI
-- 5个进程同时并行运行
-- 完全不受OpenClaw sessions架构限制
+**v5.0** 使用外部CLI实现真正的多agent并行辩论：
+- `v5/debate_parallel.sh` - Claude Code并行辩论脚本
+- `v5/game-theory/` - 博弈论分析模块（可独立使用）
 
-**版本对比**：
-
-| 版本 | 协调方式 | 状态 | 推荐度 |
-|------|---------|------|--------|
-| **v3.x** | 顺序调用 | 废弃 | ❌ |
-| **v4.0** | 主代理sessions_spawn | 配置驱动 | ⚠️ |
-| **v5.0** | bash + Claude Code并行 | ✅ **推荐** | ✅✅✅ |
+**不再维护**：v3.x 和 v4.0 已废弃（代码已移除）
 
 ## ⚠️ 安全警告
 
@@ -34,8 +28,6 @@ v5.0 会读取本地Skill文件并发送到外部API。请注意：
 2. **敏感信息**：确保Skill文件中不包含密码、API密钥或其他私密信息
 3. **路径配置**：使用环境变量 `SKILLS_DIR` 和 `OUTPUT_DIR` 避免硬编码路径
 4. **网络传输**：所有Skill内容会通过HTTPS发送到Claude API
-
-如需完全本地运行，请使用v3博弈论分析模块（不调用外部API）。
 
 ## 核心理念
 
