@@ -86,7 +86,8 @@ const DEFAULTS = {
   contextWindowSize: 6,
   summarizeEveryNRounds: 5,
   apiRetryAttempts: 3,
-  apiBaseDelay: 2000,
+  apiBaseDelay: 5000,  // [FIX] 从2000ms改为5000ms，给API更充足的响应时间
+  maxRounds: 100,      // [FIX] 新增最大轮次限制，防止恶意输入
   gameTheory: {
     totalValue: 100,
     defaultDiscountFactor: 0.9,
@@ -97,22 +98,46 @@ const DEFAULTS = {
 
 /**
  * 加载 Skill 内容（共享函数）
+ * 
+ * [FIX] 防止路径遍历攻击 + 多路径搜索
  */
 function loadSkill(skillsDir, skillName) {
   if (!skillName) return null;
-  const skillPath = path.join(skillsDir, `${skillName}-perspective`, 'SKILL.md');
-  try {
-    if (fs.existsSync(skillPath)) {
-      return fs.readFileSync(skillPath, 'utf8');
-    }
-  } catch (e) {
-    console.error(`Failed to load skill ${skillName}:`, e.message);
+  
+  // [FIX] 防止路径遍历攻击 - 只取最后一部分
+  const safeName = path.basename(skillName);
+  if (safeName !== skillName || skillName.includes('..') || skillName.includes('/') || skillName.includes('\\')) {
+    console.warn(`⚠️ 危险的skillName: ${skillName}，已被清理为: ${safeName}`);
   }
+  
+  // [FIX] 尝试多个可能的路径
+  const possiblePaths = [
+    path.join(skillsDir, safeName, 'SKILL.md'),
+    path.join(skillsDir, `${safeName}-perspective`, 'SKILL.md'),
+    path.join(skillsDir, safeName, 'skill.md'),
+    path.join(skillsDir, safeName.toLowerCase(), 'SKILL.md'),
+  ];
+  
+  for (const skillPath of possiblePaths) {
+    try {
+      if (fs.existsSync(skillPath)) {
+        const content = fs.readFileSync(skillPath, 'utf8');
+        console.log(` ✓ 加载Skill: ${safeName} (from ${path.basename(path.dirname(skillPath))})`);
+        return content;
+      }
+    } catch (e) {
+      console.warn(` ⚠️ 尝试加载 ${skillPath} 失败: ${e.message}`);
+    }
+  }
+  
+  console.warn(` ✗ Skill未找到: ${safeName}`);
   return null;
 }
 
 /**
  * 输入验证（共享函数）
+ * 
+ * [FIX] 增加rounds上限检查、skillName安全性验证
  */
 function validateConfig(config) {
   if (!config) throw new Error('配置不能为空');
@@ -126,9 +151,24 @@ function validateConfig(config) {
     if (!Number.isInteger(config.rounds) || config.rounds < 1) {
       throw new Error('轮次(rounds)必须是正整数');
     }
+    // [FIX] 添加上限检查，防止恶意输入
+    if (config.rounds > DEFAULTS.maxRounds) {
+      throw new Error(`轮次(rounds)不能超过${DEFAULTS.maxRounds}，防止资源耗尽`);
+    }
   }
   if (config.mode && !DISCUSSION_MODES[config.mode]) {
     throw new Error(`不支持的讨论模式: ${config.mode}，可选: ${Object.keys(DISCUSSION_MODES).join(', ')}`);
+  }
+  
+  // [FIX] 验证参与者名称
+  for (const p of config.participants) {
+    if (!p.name || typeof p.name !== 'string') {
+      throw new Error('每个参与者必须有name属性');
+    }
+    // 限制名称长度，防止过长的输入
+    if (p.name.length > 50) {
+      throw new Error('参与者名称不能超过50个字符');
+    }
   }
 }
 

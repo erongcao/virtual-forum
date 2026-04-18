@@ -35,8 +35,40 @@ class SubagentArena {
     this.debaterSessions = {};
     this.contextManager = null;
     this.isPaused = false;
+    this.isAborted = false;  // [FIX] 添加abort标志
+    this.abortController = null;  // [FIX] 用于graceful shutdown
     this.onRoundComplete = null; // 进度回调钩子
     this.argumentTracker = new ArgumentTracker(); // [v3.5.2 FIX] 集成论点追踪器
+    
+    // [FIX] 设置信号处理，实现graceful shutdown
+    this._setupSignalHandlers();
+  }
+
+  /**
+   * [FIX] 设置信号处理器，实现graceful shutdown
+   */
+  _setupSignalHandlers() {
+    // 仅在主进程（非测试环境）设置
+    if (process.env.NODE_ENV !== 'test' && typeof process.on === 'function') {
+      const handleAbort = () => {
+        console.log('\n⚠️ 收到中断信号，正在优雅关闭...');
+        this.abort();
+      };
+      process.on('SIGINT', handleAbort);
+      process.on('SIGTERM', handleAbort);
+    }
+  }
+
+  /**
+   * [FIX] 中断辩论（优雅关闭）
+   */
+  abort() {
+    this.isAborted = true;
+    this.isPaused = false;  // 不再暂停，直接停止
+    if (this.abortController) {
+      this.abortController.abort();
+    }
+    console.log('⚠️ 辩论已中断');
   }
 
   /**
@@ -104,8 +136,16 @@ class SubagentArena {
       }
     }
 
+    // [FIX] 如果所有Skill都加载失败，抛出错误而非继续
     if (loadFailures === participants.length) {
-      console.warn('⚠️ 所有参与者的 Skill 都加载失败，辩论质量可能很低');
+      const errMsg = '所有参与者的Skill都加载失败，辩论无法进行。请检查skillName是否正确。';
+      console.error(`❌ ${errMsg}`);
+      throw new Error(errMsg);
+    }
+    
+    // 如果部分失败，给出警告但继续
+    if (loadFailures > 0) {
+      console.warn(`⚠️ ${loadFailures}/${participants.length} 个Skill加载失败，辩论质量可能受影响`);
     }
 
     if (moderatorSkill) {
@@ -113,7 +153,7 @@ class SubagentArena {
       if (this.arena.moderatorSkillContent) {
         console.log(` ✓ 主持人 ${moderatorName}`);
       } else {
-        console.warn(` ✗ 主持人 ${moderatorName} (Skill 加载失败)`);
+        console.warn(` ⚠️ 主持人 ${moderatorName} (Skill加载失败，将使用通用主持风格)`);
       }
     }
 
@@ -162,11 +202,14 @@ ${participant.skillContent || '（无可用背景）'}
     console.log(` 模式: ${DISCUSSION_MODES[this.arena.mode]?.name || this.arena.mode}`);
     console.log(` 轮次: ${this.arena.rounds}\n`);
 
-    for (let round = 1; round <= this.arena.rounds; round++) {
-      // 检查暂停
-      while (this.isPaused) {
+    for (let round = 1; round <= this.arena.rounds && !this.isAborted; round++) {
+      // 检查暂停（但abort优先级更高）
+      while (this.isPaused && !this.isAborted) {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
+      
+      // 如果被中断，退出循环
+      if (this.isAborted) break;
 
       console.log(`--- 第 ${round}/${this.arena.rounds} 轮 ---`);
 
@@ -232,8 +275,15 @@ ${participant.skillContent || '（无可用背景）'}
       console.log(` 💰 Token 节省: ${tokenEst.savings}`);
     }
 
-    this.arena.status = 'completed';
-    console.log(`\n✅ 辩论结束`);
+    // [FIX] 处理中断退出
+    if (this.isAborted) {
+      console.log('⚠️ 辩论被中断');
+      this.arena.status = 'aborted';
+    } else {
+      this.arena.status = 'completed';
+      console.log(`\n✅ 辩论结束`);
+    }
+    
     return this.arena;
   }
 
