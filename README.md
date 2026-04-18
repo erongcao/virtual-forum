@@ -1,246 +1,260 @@
-# 虚拟论坛 Virtual Forum v3.6.1 🎭
+# 🎭 虚拟论坛 Virtual Forum v5.0
 
-> 让蒸馏的人物Skill就特定话题展开结构化辩论
+> 让蒸馏的人物Skill就特定话题展开真正的多Agent并行辩论
 
-[![Version](https://img.shields.io/badge/version-3.6.1-blue.svg)](https://github.com/erongcao/virtual-forum)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D16.0.0-brightgreen.svg)](https://nodejs.org/)
+[![Version](https://img.shields.io/badge/version-5.0.0-blue.svg)](https://github.com/erongcao/virtual-forum)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-## ✨ 核心特性
+---
 
-### 🎯 三种辩论模式 ###
+## ⚠️ v5.0 重要更新 (2026-04-18)
 
-| 模式 | 描述 | 适用场景 |
-|------|------|----------|
-| **探索性讨论** | 多角度剖析 → 发展 → 结论 | 复杂问题、需要综合视角 |
-| **对抗性辩论** | 争辩 → 交锋 → 胜负/共识 | 决策分歧、需要明确方向 |
-| **决策型讨论** | 多专家投票 → 加权评分 → 行动 | 需要拍板、有明确选项 |
+**v5.0 是唯一推荐版本**。旧版本（v3.x, v4.0）已废弃。
 
-## 🧠 v3.6.1 行为经济学增强版 (2026-04-12)
-新增三大行为经济学理论模块nn基于经典学术著作实现：
-| 理论 | 来源 | 核心功能 |
-|------|------|----------|
-| **前景理论** | Kahneman & Tversky (1979) | 风险决策分析、损失厌恶、框架效应 |
-| **有限理性** | Simon & Jones (1999) | 满意化决策、启发式、双系统理论 |
-| **助推理论** | Thaler & Sunstein (2008) | 选择架构、社会规范、默认选项 |
-### 快速开始
-```
-javascriptnconst { BehavioralEconomicsSubagentArena } = require(x27./v3/behavioral-arenax27);
-const arena = new BehavioralEconomicsSubagentArena();
-await arena.initArenaWithBehavioralEconomics(
-  {topic: "气候变化政策",
-   participants:
-       [ { name: "环保主义者", position: "激进减排" }, { name: "经济学家", position: "成本效益平衡" } ], rounds: 5});
-```
+### 核心突破
 
-### 新增文件
-`v3/behavioral/` - 行为经济学模块目录
-`v3/behavioral-arena.js` - 行为经济学增强竞技场
-### 🚀 v3.5 重大更新
+v5.0 使用 **外部CLI进程** 实现真正的多Agent并行辩论：
 
-#### 1. 博弈论增强模式 (Game Theory Mode)
-- **折扣因子(δ)**：影响参与者的耐心程度
-- **BATNA（外部选项）**：影响让步意愿
-- **贝叶斯信念更新**：根据对方行为更新判断
-- **策略提示注入**：实时策略指导
+- ✅ 5个Claude Code进程同时并行运行
+- ✅ 完全不受OpenClaw sessions架构限制
+- ✅ 无会话管理负担
+- ✅ 无上下文膨胀问题
 
-#### 2. Token节省优化 (70%↓)
-```javascript
-const contextManager = new ContextManager({
-  windowSize: 6,              // 滑动窗口
-  summarizeEvery: 5           // 每5轮摘要
-});
-// 100轮辩论: 从100K tokens降至30K tokens
-```
+---
 
-#### 3. 健壮性提升
-- ✅ 输入验证和错误处理
-- ✅ 指数退避重试机制
-- ✅ 暂停/恢复支持
-- ✅ 完整的单元测试
+## 📊 版本对比
 
-## 📦 安装
+| 版本 | 协调方式 | 技术实现 | 状态 | 推荐 |
+|------|---------|---------|------|------|
+| **v3.x** | 顺序调用 | Node.js模块 | ❌ 废弃 | 不推荐 |
+| **v4.0** | sessions_spawn | OpenClaw sessions | ❌ 废弃 | 不推荐 |
+| **v5.0** | Claude Code并行 | 外部CLI进程 | ✅ **当前** | ✅ **推荐** |
 
-```bash
-git clone https://github.com/erongcao/virtual-forum.git
-cd virtual-forum
-npm install  # 可选，主要用于测试
-```
+### 为什么v5.0能工作？
 
-**要求**: Node.js >= 16.0.0
+| 版本 | 问题 |
+|------|------|
+| **v3.x** | `getDebaterResponse()` 是空方法，需要子类实现 |
+| **v4.0** | `sessions_spawn` 对子代理不可用 |
+| **v5.0** | Claude Code是独立进程，不受OpenClaw限制 |
+
+---
 
 ## 🚀 快速开始
 
-### 基础用法
-
-```javascript
-const VirtualForum = require('./index.js');
-
-const forum = new VirtualForum();
-
-// 标准子代理辩论 (v2.0)
-const result = await forum.launchArena({
-  topic: 'AI是否会取代人类工作',
-  participants: [
-    { name: '马斯克', skillName: 'elon-musk' },
-    { name: '巴菲特', skillName: 'warren-buffett' }
-  ],
-  rounds: 10,
-  mode: 'adversarial'
-});
-
-console.log(result.output);
-```
-
-### 博弈论增强模式 (v3.5) ⭐推荐
-
-```javascript
-const result = await forum.launchGameTheoryArena({
-  topic: '公司并购谈判策略',
-  participants: [
-    { name: '买方CEO', skillName: 'aggressive-ceo' },
-    { name: '卖方CEO', skillName: 'defensive-ceo' }
-  ],
-  rounds: 20,
-  // 博弈论参数
-  discountFactors: {
-    '买方CEO': 0.95,    // 有耐心，可以长期谈判
-    '卖方CEO': 0.85     // 急于成交
-  },
-  outsideOptions: {
-    '买方CEO': 30,      // BATNA: 可以找其他目标
-    '卖方CEO': 10       // BATNA: 有限
-  },
-  totalValue: 100
-});
-
-console.log(result.output);
-console.log(result.gameTheoryReport);  // 博弈论分析报告
-```
-
-## 📚 文档
-
-- [使用指南](USAGE.md) - 详细API文档和示例
-- [CHANGELOG](CHANGELOG.md) - 版本历史
-- [架构说明](v3/README.md) - 博弈论引擎技术细节
-
-## 🧪 测试
+### 方法1：使用 Claude Code CLI（推荐）
 
 ```bash
-npm test
-# 或
-node test/run.js
+# 克隆仓库
+git clone https://github.com/erongcao/virtual-forum.git
+cd virtual-forum
+
+# 运行辩论脚本
+cd v5
+./debate_parallel.sh
 ```
 
-**测试结果预览**:
-```
-🧪 虚拟论坛 V3.5 测试套件
+### 方法2：通过 OpenClaw 调用
 
-ArgumentTracker 测试
-✓ 添加论点
-✓ 添加反驳 - P0 Bug修复验证
-✓ 分数计算
-✓ 统计摘要
-
-ContextManager 测试
-✓ 滑动窗口
-✓ 摘要触发
-✓ Token节省估算
-
-Shared Config 测试
-✓ 配置验证 - 有效配置
-✓ 配置验证 - 空话题
-✓ 讨论模式定义完整
-
-OutputFormatter 测试
-✓ 格式化对话
-✓ 格式化报告 - 补全验证
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-总计: 17 个测试
-通过: 17
-失败: 0
-
-✅ 所有测试通过！
+```javascript
+// 在OpenClaw中执行
+exec("bash /path/to/v5/debate_parallel.sh")
 ```
 
-## 🐛 Bug修复历史
+---
 
-### v3.6.1 (当前版本)
-
-| Bug | 严重性 | 修复内容 |
-|-----|--------|----------|
-| **模拟模式空壳** | 🔴 高 | `forum-engine.js` `runForum()` 完整实现 |
-| **ArgumentTracker断裂** | 🟠 中 | 子代理模式集成论点追踪 |
-| **package.json版本** | 🟡 中 | 版本号统一为3.5.2 |
-
-### v3.5.0 - v3.5.1
-
-| Bug | 严重性 | 修复内容 |
-|-----|--------|----------|
-| **rebutral拼写错误** | 🔴 P0 | `rebuttal`修正，反驳功能恢复正常 |
-| **硬编码路径** | 🟠 P1 | 移除`/Users/caoyirong`，使用动态检测 |
-| **index.js参数截断** | 🔴 P0 | `p`→`priorBeliefs`，完整参数传递 |
-| **v3/game-theory-arena.js缺失** | 🔴 P0 | 补全缺失文件 |
-| **output-formatter.js截断** | 🟡 P2 | 补全`formatReport`方法 |
-
-## 🏗️ 架构
+## 📦 目录结构
 
 ```
 virtual-forum/
-├── index.js                 # 主入口
-├── forum-engine.js          # 模拟模式引擎
-├── subagent-arena.js        # 子代理交锋引擎 (v2.0)
-├── argument-tracker.js      # 论点追踪器
-├── output-formatter.js      # 输出格式化
-├── context-manager.js       # 上下文管理 (Token优化)
-├── shared-config.js         # 共享配置 (DRY)
-├── package.json             # 项目配置
-├── v3/
-│   ├── game-theory-arena.js # 博弈论增强引擎 (v3.5)
-│   └── core/                # 博弈论核心算法
-└── test/                    # 单元测试
-    ├── argument-tracker.test.js
-    ├── context-manager.test.js
-    ├── shared-config.test.js
-    └── run.js
+├── README.md                    # 本文档
+├── CHANGELOG.md                 # 版本历史
+├── SKILL.md                    # Skill完整文档
+├── USAGE.md                    # 详细使用指南
+├── package.json                # 项目配置
+├── index.js                    # Node.js API入口
+├── v5/                        # ⭐ v5.0 Claude Code方案
+│   ├── README.md              # v5.0说明
+│   └── debate_parallel.sh      # 并行辩论脚本
+├── v3/                        # v3.x博弈论模块
+│   ├── game-theory-arena.js   # 博弈论引擎
+│   ├── behavioral-arena.js    # 行为经济学
+│   └── advanced-game-theory.js # 高级博弈论
+├── subagent-arena.js          # v2.0子代理引擎（废弃）
+└── test/                      # 单元测试
 ```
 
-## 🤝 与其他Skill的集成
+---
 
-### 与 AI Hedge Fund Skill 结合
+## 🎯 功能特性
 
-```javascript
-// 投资委员会辩论
-const result = await forum.launchGameTheoryArena({
-  topic: 'NVDA估值是否合理',
-  participants: [
-    { name: '巴菲特', skillName: 'warren-buffett' },
-    { name: '木头姐', skillName: 'cathie-wood' },
-    { name: '达里奥', skillName: 'ray-dalio' }
-  ],
-  discountFactors: {
-    '巴菲特': 0.95,    // 长期视角
-    '木头姐': 0.85,    // 短期激进
-    '达里奥': 0.90     // 平衡
-  }
-});
+### 支持的辩论模式
+
+| 模式 | 描述 | 适用场景 |
+|------|------|---------|
+| **探索性** | 多角度剖析 → 发展 → 结论 | 复杂问题需要综合视角 |
+| **对抗性** | 争辩 → 交锋 → 胜负/共识 | 决策分歧需要明确方向 |
+| **决策型** | 多专家投票 → 加权评分 → 行动 | 需要拍板有明确选项 |
+
+### 可配置参数
+
+```
+辩论轮次: 10 / 20 / 50 轮
+参与者: 2-N 人
+主持人: 可选
+发言字数: 300-500字/轮
+胜负判定: 点数制 / 投票制 / 让步制
 ```
 
-## 📝 使用场景
+---
 
-1. **投资决策** - 让投资大师辩论特定股票
-2. **政策分析** - 模拟不同政治立场的交锋
-3. **产品决策** - 让不同角色讨论产品方向
-4. **学术讨论** - 模拟学术观点的辩论
-5. **谈判准备** - 通过博弈论分析最优策略
+## 🔧 v5.0 技术细节
 
-## ⚠️ 诚实边界
+### 工作原理
 
-- 虚拟论坛的观点是基于Skill中记录的思维框架**模拟**生成
-- 不是真实的人物在思考
-- 结果应作为参考，不是真理
-- 胜负判定是游戏化的，帮助结构化思考
+```bash
+# 1. 读取所有参与者的Skill文件
+TRUMP_SKILL=$(cat ~/.openclaw/skills/donald-trump-perspective/SKILL.md)
+
+# 2. 构建系统提示
+TRUMP_PROMPT="你是特朗普。背景：$TRUMP_SKILL ..."
+
+# 3. 并行启动5个Claude Code进程
+(echo "$USER_MSG" | claude --print --system-prompt "$TRUMP_PROMPT") &
+(echo "$USER_MSG" | claude --print --system-prompt "$NETANYAHU_PROMPT") &
+(echo "$USER_MSG" | claude --print --system-prompt "$PEZESHKIAN_PROMPT") &
+(echo "$USER_MSG" | claude --print --system-prompt "$VANCE_PROMPT") &
+(echo "$USER_MSG" | claude --print --system-prompt "$PUTIN_PROMPT") &
+
+# 4. 等待所有进程完成
+wait
+
+# 5. 主持人顺序总结
+claude --print --system-prompt "$STARMER_PROMPT"
+```
+
+### 依赖要求
+
+| 依赖 | 版本 | 说明 |
+|------|------|------|
+| Claude Code CLI | 2.1.74+ | 必须安装并配置 |
+| bash | 4.0+ | Unix/Linux/macOS |
+| API认证 | 有效 | MiniMax API配置 |
+
+### 安装 Claude Code
+
+```bash
+# macOS
+brew install claude
+
+# 或 npm
+npm install -g @anthropic/claude-code
+
+# 配置API密钥
+claude auth
+```
+
+---
+
+## 📚 文档导航
+
+| 文档 | 内容 |
+|------|------|
+| **README.md** | 概述和快速开始 |
+| **SKILL.md** | Skill完整API文档 |
+| **USAGE.md** | 详细使用指南和示例 |
+| **CHANGELOG.md** | 版本历史和更新内容 |
+| **v5/README.md** | Claude Code方案详情 |
+
+---
+
+## 🧪 测试验证
+
+v5.0 已成功运行10轮辩论测试：
+
+| 指标 | 数值 |
+|------|------|
+| 辩论轮次 | 10轮 |
+| 并行参与者 | 5人 |
+| 主持人总结 | 10次 |
+| 总调用次数 | 60次 |
+| 输出文件大小 | 294KB |
+| 生成时间 | ~18分钟 |
+
+### 测试结果摘要
+
+辩论主题：**2026年美国、以色列、伊朗三国战争走向**
+
+最终方案：
+- 伊朗铀库存转移至俄罗斯
+- 90天维也纳谈判窗口
+- IAEA实时核查
+- 欧洲30天内入场
+
+---
+
+## 🤝 集成指南
+
+### 与蒸馏人物Skill配合
+
+v5.0 需要预先蒸馏的人物Skill：
+
+```bash
+# 人物Skill路径
+~/.openclaw/workspace/skills/
+├── donald-trump-perspective/     # 特朗普
+├── benjamin-netanyahu-perspective/ # 内塔尼亚胡
+├── masoud-pezeshkian-perspective/ # 佩泽希齐扬
+├── jd-vance-perspective/         # 万斯
+├── vladimir-putin-perspective/    # 普京
+└── keir-starmer-perspective/     # 斯塔默(主持人)
+```
+
+### 自定义辩论
+
+修改 `debate_parallel.sh` 中的配置：
+
+```bash
+# 修改话题
+TOPIC="你选择的话题"
+
+# 修改参与者（需对应Skill路径）
+PARTICIPANTS=(
+    "id:skill-name:显示名"
+)
+
+# 修改轮次
+ROUNDS=10
+```
+
+---
+
+## ⚠️ 限制和注意事项
+
+### 限制
+
+1. **API配额** - 每个Claude Code进程消耗独立API配额
+2. **网络依赖** - 需要稳定的网络连接
+3. **认证要求** - 需要有效的MiniMax API密钥
+
+### 注意事项
+
+1. **成本控制** - 60次调用可能产生较高成本
+2. **并发限制** - 系统资源充足时可支持更多并行
+3. **上下文** - 每轮独立上下文，历史需手动累积
+
+---
+
+## 🐛 问题排查
+
+| 问题 | 解决方案 |
+|------|---------|
+| Claude Code未找到 | 安装： `brew install claude` |
+| API认证失败 | 运行： `claude auth` |
+| 进程超时 | 调整脚本中的timeout设置 |
+| 权限错误 | `chmod +x debate_parallel.sh` |
+
+---
 
 ## 📄 许可证
 
@@ -248,6 +262,21 @@ MIT License
 
 ---
 
-**版本**: v3.6.1  
-**最后更新**: 2026-04-12  
-**作者**: erongcao
+## 📝 版本历史
+
+| 版本 | 日期 | 主要内容 |
+|------|------|---------|
+| **5.0.0** | 2026-04-18 | Claude Code并行方案，废弃v3.x/v4.0 |
+| **3.9.2** | 2026-04-18 | Bug修复：除零错误、逻辑错误 |
+| **3.9.0** | 2026-04-18 | 议价博弈+联盟博弈 |
+| **3.8.0** | 2026-04-18 | 高级博弈论模块 |
+| **3.6.1** | 2026-04-12 | 行为经济学增强版 |
+
+详见 [CHANGELOG.md](CHANGELOG.md)
+
+---
+
+**版本**: v5.0.0  
+**最后更新**: 2026-04-18  
+**作者**: erongcao  
+**仓库**: https://github.com/erongcao/virtual-forum
