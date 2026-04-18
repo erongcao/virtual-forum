@@ -2,6 +2,19 @@
 
 All notable changes to the Virtual Forum skill will be documented in this file.
 
+## [3.9.1] - 2026-04-18
+
+### Fixed
+- **P0**: 除零错误 - `calculateEquilibrium()` 当 δ₁=1 且 δ₂=1 时
+- **P0**: 除零错误 - `calculateEquilibriumShares()` 同样问题
+- **P0**: 语法错误 - `generateOffer建议()` 函数名包含中文字符
+- **P0**: 溢出风险 - `_factorial(25)` 超过 `Number.MAX_SAFE_INTEGER`
+- **P1**: 议价逻辑 - `evaluateOffer()` 的 `futureValueIfReject` 公式错误
+- **Low**: Emoji乱码 - `� coalition` → `🛡 联盟博弈`
+
+### Documentation
+- Added `CODE_REVIEW_v3.9.md` - 详细的问题报告和修复说明
+
 ## [3.9.0] - 2026-04-18
 
 ### Added

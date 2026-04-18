@@ -464,7 +464,20 @@ class BargainingGame {
         // 均衡条件：δ₂/(1-δ₁δ₂) vs δ₁/(1-δ₁δ₂)
         // 总蛋糕 = 1
         
+        // [P0 FIX] 防止除零
         const denominator = 1 - delta1 * delta2;
+        if (Math.abs(denominator) < 1e-9) {
+            // δ₁=1 且 δ₂=1 时，双方平分
+            return {
+                player1: { share: 0.5, sharePercent: '50.0%' },
+                player2: { share: 0.5, sharePercent: '50.0%' },
+                firstMover,
+                firstMoverAdvantage: '0.000',
+                total: 1,
+                equilibrium: 'Rubinstein (degenerate)',
+                note: 'δ₁=δ₂=1时无时间成本，平分收益',
+            };
+        }
         
         let p1Share, p2Share;
         
@@ -495,9 +508,16 @@ class BargainingGame {
      * 计算均衡（给定贴现因子）
      */
     calculateEquilibriumShares(delta1, delta2) {
-        // Rubinstein均衡公式
+        // [P0 FIX] 防止除零
         const denominator = 1 - delta1 * delta2;
-        
+        if (Math.abs(denominator) < 1e-9) {
+            return {
+                p1IfFirst: { share: 0.5, percent: '50.0%' },
+                p2IfFirst: { share: 0.5, percent: '50.0%' },
+                note: 'δ₁=δ₂=1时无时间成本，平分收益',
+            };
+        }
+
         // 玩家1的份额（当玩家1先出价时）
         const p1First = (1 - delta2) / denominator;
         
@@ -582,19 +602,32 @@ class BargainingGame {
      * @param {number} roundNumber - 当前轮次
      */
     evaluateOffer(player, offeredShare, myDelta, opponentDelta, roundNumber) {
-        // 计算当前轮次接受的价值
+        // [P1 FIX] 更正的接受/拒绝逻辑
+        // 接受：立即获得 offeredShare
+        // 拒绝：进入下一轮，我的份额会被贴现
+        // 下一轮我能获得的 ≈ 均衡份额 × δ（贴现）
+        
         const currentValueIfAccept = offeredShare;
         
-        // 计算下一轮拒绝的价值（贴现后）
-        const futureValueIfReject = (1 - offeredShare) * myDelta;  // 下一轮我能获得的
+        // [P0 FIX] 防止除零
+        const denominator = 1 - myDelta * opponentDelta;
+        let futureValueIfReject;
+        
+        if (Math.abs(denominator) < 1e-9 || myDelta >= 1) {
+            // 无贴现成本时，下一轮价值和当前一样
+            futureValueIfReject = offeredShare;
+        } else {
+            // Rubinstein均衡下，下一轮我能获得的（贴现后）
+            // 对方会出接近均衡的价格，我的份额 = δ × myEquilibriumShare
+            const myEquilibriumShare = (1 - opponentDelta) / denominator;
+            futureValueIfReject = myEquilibriumShare * myDelta;
+        }
         
         // 是否接受？
-        const shouldAccept = currentValueIfAccept >= futureValueIfReject;
+        const shouldAccept = currentValueIfAccept >= futureValueIfReject - 0.01; // 容忍误差
         
-        // 接受率
-        const acceptProbability = this._calculateAcceptanceProbability(
-            currentValueIfAccept, futureValueIfReject
-        );
+        // 接受率（基于确定性等价）
+        const acceptProbability = currentValueIfAccept >= futureValueIfReject ? 0.9 : 0.3;
 
         return {
             player,
@@ -604,13 +637,13 @@ class BargainingGame {
             shouldAccept,
             acceptProbability: (acceptProbability * 100).toFixed(0) + '%',
             rationale: shouldAccept 
-                ? `接受：当前${(currentValueIfAccept*100).toFixed(1)}% > 未来${(futureValueIfReject*100).toFixed(1)}%`
-                : `拒绝：当前${(currentValueIfAccept*100).toFixed(1)}% < 未来${(futureValueIfReject*100).toFixed(1)}%，等待更多`,
+                ? `接受：当前${(currentValueIfAccept*100).toFixed(1)}% ≥ 未来${(futureValueIfReject*100).toFixed(1)}%`
+                : `拒绝：当前${(currentValueIfAccept*100).toFixed(1)}% < 未来${(futureValueIfReject*100).toFixed(1)}%，等待更优报价`,
             breakdown: {
                 currentRound: roundNumber,
                 myDiscount: myDelta,
                 oppDiscount: opponentDelta,
-                timeToNextRound: '1 period',
+                nextRoundShare: (futureValueIfReject).toFixed(3),
             },
         };
     }
@@ -799,10 +832,20 @@ class CoalitionGame {
     }
 
     /**
-     * 阶乘
+     * 阶乘（溢出保护）
+     * [P0 FIX] 对于n>20使用对数计算，避免溢出
      */
     _factorial(n) {
         if (n <= 1) return 1;
+        // [P0 FIX] n! 在 n>20 时超过 Number.MAX_SAFE_INTEGER
+        if (n > 20) {
+            // 使用对数：log(n!) = Σ log(i)
+            let logSum = 0;
+            for (let i = 2; i <= n; i++) {
+                logSum += Math.log(i);
+            }
+            return Math.exp(logSum);
+        }
         let result = 1;
         for (let i = 2; i <= n; i++) {
             result *= i;
@@ -1031,7 +1074,7 @@ class CoalitionGame {
         const stability = this.checkCoreStability(shapley.shapleyValues);
         const prediction = this.predictOptimalCoalition();
 
-        let report = '� coalition博弈分析\n';
+        let report = '🛡 联盟博弈分析\n';
         report += '═══════════════════════════════════\n\n';
 
         report += 'Shapley值分配:\n';
@@ -1174,7 +1217,7 @@ class AdvancedGameTheoryArena extends SubagentArena {
     /**
      * 生成出价建议
      */
-    generateOffer建议(player, myDelta, opponentDelta, currentValue = 100) {
+    generateOffer(player, myDelta, opponentDelta, currentValue = 100) {
         return this.bargainingGame.generateOffer(
             player,
             myDelta,
