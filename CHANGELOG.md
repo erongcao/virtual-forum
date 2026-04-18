@@ -2,6 +2,11 @@
 
 All notable changes to the Virtual Forum skill will be documented in this file.
 
+## [5.0.3] - 2026-04-18
+
+### Note
+- ClawHub发布问题修复（重试发布）
+
 ## [5.0.2] - 2026-04-18
 
 ### Breaking Change
