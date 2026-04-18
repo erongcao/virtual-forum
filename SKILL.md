@@ -435,6 +435,134 @@ const report = arena.generateBehavioralReport();
 // 包含：博弈论分析 + 行为经济学洞察 + 综合策略建议
 ```
 
+---
+
+## v3.8 高级博弈论版 (2026-04-18)
+
+实现真正的信号博弈、重复博弈和信息设计，基于：
+- **Spence (1973)** - 信号博弈理论
+- **Folk Theorem** - 无限期重复博弈
+- **Kamenica & Mandler (2012)** - 贝叶斯说服理论
+
+解决虚拟论坛最核心的三个问题：
+- 📡 **谁说的可信？** → 信号博弈
+- 🤝 **多轮后会合作还是撕破脸？** → 重复博弈
+- 📢 **主持人应该透露什么？** → 信息设计
+
+### 核心新增模块
+
+```javascript
+const {
+    SignalingGame,
+    RepeatedGameEngine,
+    InformationDesigner,
+    AdvancedGameTheoryArena,
+} = require('./v3/advanced-game-theory');
+
+const arena = new AdvancedGameTheoryArena();
+await arena.initArenaWithAdvancedGameTheory({
+    topic: "AI监管应该严格还是宽松",
+    participants: [
+        { name: "巴菲特", skillName: "buffett" },
+        { name: "马斯克", skillName: "musk" }
+    ],
+    discountFactors: { '巴菲特': 0.95, '马斯克': 0.85 },
+    signals: { '巴菲特': 'expert', '马斯克': 'strategic' }
+});
+```
+
+### 理论实现
+
+#### 1. 信号博弈 (SignalingGame)
+
+**核心问题**：发言者是"真的有观点"还是"只是说说"？
+
+**均衡类型**：
+- **分离均衡 (Separating)**: 不同类型选择不同信号 → 高成本信号 = 强信念
+- **混同均衡 (Pooling)**: 不同类型选择相同信号 → 信号无信息量
+
+**信号分类**：
+| 信号类型 | 成本 | 可靠性 |
+|---------|------|--------|
+| strong_claim | 高 | 高（专家发出时） |
+| evidence_backed | 高 | 高 |
+| weak_claim | 低 | 低 |
+| assertion | 低 | 低 |
+
+**贝叶斯可信度评估**：
+```javascript
+const assessment = arena.assessArgumentCredibility('巴菲特', content);
+// 返回: { signalType, signalCost, prior, posterior, isSeparating, credible, confidence }
+```
+
+#### 2. 重复博弈 (RepeatedGameEngine)
+
+**核心问题**：多轮后会合作还是撕破脸？
+
+**战略类型**：
+| 战略 | 描述 | 适用场景 |
+|------|------|----------|
+| Grim Trigger | 一但背叛，永远惩罚 | 长期关系 |
+| Tit-for-Tat | 合作取决于对手上一轮 | 中期互动 |
+| Generous TFT | 偶尔原谅背叛 | 修复关系 |
+| Suspicious TFT | 需要两次合作才原谅 | 高对抗 |
+
+**Folk Theorem条件**：背叛收益 < 长期合作价值时，合作是均衡
+
+**合作阶段检测**：
+```javascript
+const phase = repeatedGame.getPhaseAnalysis();
+// { phase: 'COOPERATION'|'TRANSITION'|'CONFLICT', stability, risk }
+```
+
+#### 3. 信息设计 (InformationDesigner)
+
+**核心问题**：主持人应该透露多少信息？
+
+**披露模式**：
+| 模式 | 说明 | 适用场景 |
+|------|------|----------|
+| FULL | 完全披露 | 状态平衡时 |
+| STRATEGIC | 策略性披露 | 过度自信主导时 |
+| CONDITIONAL | 条件披露 | 信息不对称时 |
+
+**问题诊断**：
+- OVERCONFIDENT_DOMINANT: 多数人过度自信
+- BELIEF_DIVERGENCE: 信念分歧大
+- INFORMATION_ASYMMETRY: 信息不对称
+
+### 使用示例
+
+```javascript
+// 评估发言可信度
+const credibility = arena.assessArgumentCredibility('巴菲特', 'AI风险被高估了');
+
+// 获取策略建议
+const advice = arena.getStrategicAdvice('巴菲特', '马斯克');
+
+// 建议信息披露
+const disclosure = arena.suggestInformationDisclosure();
+
+// 综合报告
+const report = arena.generateAdvancedGameTheoryReport();
+
+// 摘要评分
+const score = arena.getSummaryScore();
+// { signalQuality: '75', cooperationLevel: '82', discussionPhase: 'COOPERATION', overallHealth: '79' }
+```
+
+### 对比: v3.7 vs v3.8
+
+| 功能 | v3.7 | v3.8 |
+|------|------|------|
+| Nash均衡 | ✅ | ✅ |
+| 贝叶斯信念更新 | ✅ | ✅ |
+| **信号博弈** | ❌ | ✅ |
+| **重复博弈/合作** | ❌ | ✅ |
+| **信息设计** | ❌ | ✅ |
+| **分离/混同均衡** | ❌ | ✅ |
+| **Folk Theorem** | ❌ | ✅ |
+
 ### 文件结构
 
 ```
@@ -445,8 +573,16 @@ v3/
 │   ├── bounded-rationality.js # 有限理性引擎
 │   └── nudge-theory.js      # 助推理论引擎
 ├── behavioral-arena.js      # v3.6 行为经济学竞技场
-└── game-theory-arena.js     # v3.5 博弈论竞技场
+├── game-theory-arena.js     # v3.5 博弈论竞技场
+├── game-theory-v2.js        # v3.7 博弈论增强版
+└── advanced-game-theory.js  # v3.8 高级博弈论版 🆕
 ```
+
+**使用建议**：
+- 简单辩论: `SubagentArena` (v3.4)
+- 博弈论分析: `GameTheoryArena` (v3.7)
+- 深度辩论: `AdvancedGameTheoryArena` (v3.8) ← 推荐
+- 行为经济学: `BehavioralEconomicsSubagentArena` (v3.6)
 
 ### 理论来源
 

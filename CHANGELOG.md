@@ -2,7 +2,68 @@
 
 All notable changes to the Virtual Forum skill will be documented in this file.
 
+## [3.8.0] - 2026-04-18
+
+### Added
+- **AdvancedGameTheoryArena** (v3/advanced-game-theory.js): 高级博弈论模块
+
+#### 1. 信号博弈 (SignalingGame)
+  - 分离均衡/混同均衡检测
+  - 贝叶斯可信度评估 P(H|E) = P(E|H)P(H)/P(E)
+  - 信号成本分析 (strong_claim, evidence_backed, weak_claim, assertion)
+  - 似然比计算
+  - 互信息计算
+
+#### 2. 重复博弈 (RepeatedGameEngine)
+  - Folk Theorem实现
+  - 四种策略: Grim Trigger, Tit-for-Tat, Generous TFT, Suspicious TFT
+  - 合作率追踪
+  - 阶段分析 (COOPERATION, TRANSITION, CONFLICT)
+  - 惩罚/原谅机制
+
+#### 3. 信息设计 (InformationDesigner)
+  - Kamenica & Mandler 2012贝叶斯说服理论
+  - 三种披露模式: FULL, STRATEGIC, CONDITIONAL
+  - 问题诊断: OVERCONFIDENT_DOMINANT, BELIEF_DIVERGENCE, INFORMATION_ASYMMETRY
+  - 最优信号设计
+
+### Documentation
+- Updated SKILL.md with v3.8 section
+- Complete theory explanations with formulas
+- Comparison table: v3.7 vs v3.8
+- Usage recommendations
+
+### Technical Details
+
+**信号博弈 - 分离均衡条件**:
+```
+P(真|信号) > P(真) 且 信号成本 > 阈值
+```
+
+**重复博弈 - Folk Theorem**:
+```
+背叛条件: T < R / (1-δ)
+其中 T=背叛诱惑, R=合作奖励, δ=贴现因子
+```
+
+**信息设计 - 策略选择**:
+```
+IF 过度自信 > 50%: STRATEGIC披露
+ELIF 信念分歧 > 0.3: 聚焦共同知识
+ELIF 信息不对称: CONDITIONAL披露
+ELSE: FULL披露
+```
+
 ## [3.7.0] - 2026-04-18
+
+### Added
+- **GameTheoryArena** (v3/game-theory-v2.js): True game theory implementation
+  - `GameStructure` class: Explicit payoff matrix and Nash equilibrium calculation
+  - `BayesianBeliefSystem` class: Real Bayesian updates (not hardcoded multipliers)
+  - `GameStateTracker` class: Game state tracking
+  - 2x2 game analytical solution (Myerson 1991)
+  - Fictitious Play approximation for N-player games
+  - Nash equilibrium calculation with confidence score
 
 ### Added
 - **GameTheoryArena** (v3/game-theory-v2.js): True game theory implementation
