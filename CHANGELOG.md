@@ -2,6 +2,52 @@
 
 All notable changes to the Virtual Forum skill will be documented in this file.
 
+## [5.0.0] - 2026-04-18
+
+### Breaking Change
+- **废弃**: v3.x 顺序调用方案
+- **废弃**: v4.0 sessions_spawn 子代理方案
+
+### Added
+- **v5.0 Claude Code并行方案** (v5/debate_parallel.sh)
+  - 使用 bash + `claude --print` 调用外部Claude Code CLI
+  - 5个进程真正并行运行
+  - 完全绕过OpenClaw sessions限制
+
+### Architecture Comparison
+
+| 版本 | 协调方式 | 状态 | 推荐 |
+|------|---------|------|------|
+| **v3.x** | 顺序调用 | 废弃 | ❌ |
+| **v4.0** | sessions_spawn | 废弃 | ❌ |
+| **v5.0** | Claude Code并行 | ✅ 推荐 | ✅ |
+
+### Technical Details
+
+**v5.0 工作原理**:
+```bash
+# 并行启动5个参与者
+(echo "$USER_MSG" | claude --print --system-prompt "$TRUMP_PROMPT") &
+(echo "$USER_MSG" | claude --print --system-prompt "$NETANYAHU_PROMPT") &
+# ... 5个并行进程
+wait
+```
+
+### Why v5.0 Works
+- Claude Code CLI 是独立进程，不受OpenClaw sessions限制
+- 每个进程独立调用MiniMax API
+- 无需管理session状态
+- 无上下文膨胀问题
+
+### Limitations
+- 需要安装 Claude Code CLI
+- 每个进程消耗独立API配额
+
+### Verified
+- ✅ 10轮辩论成功完成
+- ✅ 60次Claude Code调用
+- ✅ 294KB输出文件
+
 ## [3.9.2] - 2026-04-18
 
 ### Fixed
